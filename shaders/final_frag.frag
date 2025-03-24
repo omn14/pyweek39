@@ -32,7 +32,7 @@ vec4 showVelocity(vec2 uv)
     }
     else
     {
-        return abs(color.gbra) * 0.01;
+        return abs(color.gbra) * 0.1;
         //return vec4(abs(color.b), 1.0 - abs(color.gr), 1.0) * 0.008;
     }
 }

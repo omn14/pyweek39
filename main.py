@@ -3,6 +3,7 @@ from panda3d.core import FrameBufferProperties, GraphicsOutput, Texture, Shader,
 from panda3d.core import loadPrcFileData
 from panda3d.core import AmbientLight, DirectionalLight, PointLight
 import numpy as np
+from panda3d.bullet import BulletWorld, BulletPlaneShape, BulletRigidBodyNode
 # Load configuration settings to show buffers
 loadPrcFileData("", "show-buffers t")
 
@@ -29,7 +30,10 @@ class ShaderToyApp(ShowBase):
         # Set the background color to green
         self.win.set_clear_color((1, 1, 1, 1))
         # Add the task to update shaders with time
-        sample_texture = self.loader.loadTexture("/home/ole/Pictures/girlSeatedInWater_mirror.jpg")
+        sample_texture = self.loader.loadTexture("assets/riversInspo/01_gimpriver.png")
+        sample_texture_gimp_gradient = self.loader.loadTexture("assets/riversInspo/02_gimpgradient.png")
+        self.cards['A'].set_shader_input("gimpriver", sample_texture)
+        self.cards['A'].set_shader_input("gimpgradient", sample_texture)
         self.cards['A'].set_shader_input("iChannel3", self.textures['D'])
 
         self.cards['B'].set_shader_input("iChannel0", self.textures['A'])
@@ -44,6 +48,8 @@ class ShaderToyApp(ShowBase):
         self.taskMgr.add(self.update_shaders, "UpdateShadersTask")
         self.accept("v", self.bufferViewer.toggleEnable)
         self.taskMgr.add(self.sampleVelField, "SampleVelFieldTask")
+        
+        self.setup_physics()
         
 
     
@@ -213,6 +219,30 @@ class ShaderToyApp(ShowBase):
             #print(f"Pixel at ({x},{y}): {pixel_data[y, x, :3]}")  # Just RGB (y,x)
             
         return task.cont
+    
+    def setup_physics(self):
+
+        # Create the Bullet physics world
+        self.physics_world = BulletWorld()
+        self.physics_world.set_gravity((0, 0, -9.81))
+
+        # Create a ground plane
+        plane_shape = BulletPlaneShape((0, 0, 1), 0)  # Normal vector (0, 0, 1), offset 0
+        ground_node = BulletRigidBodyNode('Ground')
+        ground_node.add_shape(plane_shape)
+        ground_np = self.render.attach_new_node(ground_node)
+        ground_np.set_pos(0, 0, 0)
+        self.physics_world.attach(ground_node)
+
+        # Add a task to update the physics simulation
+        self.taskMgr.add(self.update_physics, "UpdatePhysicsTask")
+
+    def update_physics(self, task):
+        dt = globalClock.get_dt()
+        self.physics_world.do_physics(dt)
+        return task.cont
+    
+
     
 
 if __name__ == "__main__":

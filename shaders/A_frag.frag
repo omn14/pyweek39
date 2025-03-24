@@ -4,13 +4,16 @@ uniform vec2 iResolution;
 uniform sampler2D iChannel3;
 uniform float iTimeDelta;
 uniform float iTime;
+uniform sampler2D gimpriver;
+uniform sampler2D gimpgradient;
+
 in vec2 uv;
 out vec4 gl_FragColor;
 
 // Advection & force
 
 // Magic force within a rectangle.
-const vec2 Force = vec2(100.0, 0.0);
+const vec2 Force = vec2(75.0, 0.0);
 const vec2 ForceAreaMin = vec2(0.0, 0.2); 
 const vec2 ForceAreaMax = vec2(0.06, 0.8);
 
@@ -50,9 +53,12 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     if(uv.x > ForceAreaMin.x && uv.x < ForceAreaMax.x &&
        uv.y > ForceAreaMin.y && uv.y < ForceAreaMax.y)
     {
-    	outputVelocity += Force * iTimeDelta;
+    	outputVelocity += abs(sin(iTime))*Force * iTimeDelta;
         //outputVelocity = Force ;
     }
+
+    //outputVelocity += 100*texture(gimpgradient, uv).xy;
+    outputVelocity += vec2(10.0,0.0)* iTimeDelta/iTime;
     
     // Clamp velocity at borders to zero.
     if(uv.x > 1.0 - inverseResolution.x ||
@@ -73,13 +79,21 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     {
         fragColor = vec4(0.0, 0.0, 999.0, 0.0);
     }
+    else if (texture(gimpriver, uv).x > 0.0)
+    {
+        fragColor = vec4(0.0, 0.0, 999.0, 0.0);
+    }
     else
     {
         fragColor = vec4(outputVelocity, 0.0, 0.0);
 
     } 
-
-    
+/* 
+    float land = texture(gimpriver, uv).x;
+    if(land > 0.0)
+    {
+        fragColor = vec4(0.0, 0.0, 999.0, 0.0);
+    } */
 
 
     // Encoding
