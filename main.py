@@ -4,6 +4,11 @@ from panda3d.core import loadPrcFileData
 from panda3d.core import AmbientLight, DirectionalLight, PointLight
 import numpy as np
 from panda3d.bullet import BulletWorld, BulletPlaneShape, BulletRigidBodyNode
+from panda3d.core import Filename
+from panda3d.core import PNMImage
+from panda3d.bullet import BulletHeightfieldShape
+from panda3d.bullet import ZUp
+from panda3d.bullet import BulletDebugNode
 # Load configuration settings to show buffers
 loadPrcFileData("", "show-buffers t")
 
@@ -31,9 +36,9 @@ class ShaderToyApp(ShowBase):
         self.win.set_clear_color((1, 1, 1, 1))
         # Add the task to update shaders with time
         sample_texture = self.loader.loadTexture("assets/riversInspo/01_gimpriver.png")
-        sample_texture_gimp_gradient = self.loader.loadTexture("assets/riversInspo/02_gimpgradient.png")
+        self.sample_texture_gimp_gradient = self.loader.loadTexture("assets/riversInspo/02_gimpgradient.png")
         self.cards['A'].set_shader_input("gimpriver", sample_texture)
-        self.cards['A'].set_shader_input("gimpgradient", sample_texture)
+        self.cards['A'].set_shader_input("gimpgradient", self.sample_texture_gimp_gradient)
         self.cards['A'].set_shader_input("iChannel3", self.textures['D'])
 
         self.cards['B'].set_shader_input("iChannel0", self.textures['A'])
@@ -133,11 +138,13 @@ class ShaderToyApp(ShowBase):
         # Create a quad for the final display
         #quad = self.loader.loadModel("models/plane")
         card_maker = CardMaker("final_card")
-        card_maker.set_frame_fullscreen_quad()
+        #card_maker.set_frame_fullscreen_quad()
+        card_maker.set_frame(-0.5, 0.5, -0.5, 0.5)
         self.quad = NodePath(card_maker.generate())
         self.quad.reparent_to(self.render)
-        self.quad.setPos(0,5,0)
-        self.quad.setScale(3,1,1)
+        self.quad.setPos(0,0,0)
+        self.quad.setScale(3*64,64,64)
+        self.quad.setP(-90)
         #self.quad.set_shader(Shader.load(Shader.SLGLSL, "shaders/A_vert.vert", "shaders/A_frag.frag"))
         self.quad.set_shader(Shader.load(Shader.SL_GLSL, "shaders/final_vert.vert", "shaders/final_frag.frag"))
         #self.quad.set_shader_input("iTime", 1)
@@ -233,7 +240,16 @@ class ShaderToyApp(ShowBase):
         ground_np = self.render.attach_new_node(ground_node)
         ground_np.set_pos(0, 0, 0)
         self.physics_world.attach(ground_node)
-
+        self.bulletTerrain()
+        # Create a debug node
+        debug_node = BulletDebugNode('Debug')
+        debug_node.show_wireframe(True)
+        debug_node.show_constraints(True)
+        debug_node.show_bounding_boxes(False)
+        debug_node.show_normals(False)
+        debug_np = self.render.attach_new_node(debug_node)
+        debug_np.show()
+        self.physics_world.set_debug_node(debug_node)  
         # Add a task to update the physics simulation
         self.taskMgr.add(self.update_physics, "UpdatePhysicsTask")
 
@@ -241,6 +257,38 @@ class ShaderToyApp(ShowBase):
         dt = globalClock.get_dt()
         self.physics_world.do_physics(dt)
         return task.cont
+    
+    def bulletTerrain(self):
+        # Create a terrain shape
+        """ terrain_shape = BulletHeightfieldShape(
+            np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]]),
+            1, False, False, True
+        )
+        # Create a heightfield
+        size = 64
+        height_data = np.zeros((size, size), dtype=np.float32)
+        # Fill height_data with your terrain heights
+
+        # Create the shape
+        heightfield_shape = BulletHeightfieldShape(
+            height_data, 1.0,  # Height scale
+            -10, 10,  # Min/max heights
+            up="z"  # Up axis
+        )
+         """
+        height = 10.0
+        img = PNMImage(Filename('assets/riversInspo/03_gimpriver_scaled.png'))
+        shape = BulletHeightfieldShape(img, height, ZUp)
+        #shape = BulletHeightfieldShape(self.sample_texture_gimp_gradient, height, ZUp)
+
+
+        # Create a terrain node
+        terrain_node = BulletRigidBodyNode('Terrain')
+        terrain_node.add_shape(shape)
+        terrain_np = self.render.attach_new_node(terrain_node)
+        terrain_np.set_pos(0, 0, 0)
+        self.physics_world.attach(terrain_node)
+        return terrain_np
     
 
     

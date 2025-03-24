@@ -71,7 +71,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     
     // Circle barrier.
 
-    BarrierPosition = vec2(0.2, abs(sin(iTime))/2);
+    BarrierPosition = vec2(1.2, abs(sin(iTime))/2);
     vec2 toBarrier = BarrierPosition - uv;
     toBarrier.x *= inverseResolution.y / inverseResolution.x;
     //vec4 fragColorN = vec4(0.0);
