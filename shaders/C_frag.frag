@@ -5,6 +5,7 @@ uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform sampler2D iChannel2;
 //uniform float iTimeDelta;
+uniform vec2 iLogPos;
 in vec2 uv;
 out vec4 gl_FragColor;
 
@@ -15,9 +16,11 @@ out vec4 gl_FragColor;
 #define PressureTexture iChannel2
 #define VelocityTexture iChannel0
 
-vec2 inverseResolution;
+//vec2 inverseResolution;
 vec2 border;
 //vec2 uv;
+vec2 inverseResolution = vec2(1.0) / iResolution.xy;
+const float BarrierRadiusSq = 0.001;
 
 float samplePressure(vec2 pos)
 {
@@ -25,6 +28,18 @@ float samplePressure(vec2 pos)
     if(texture(VelocityTexture, pos).z > 0.0)
     {
         return 0.0;
+    }
+
+    //BarrierPosition = vec2(1.2, abs(sin(iTime))/2);
+    //BarrierPosition = iLogPos;
+    vec2 toBarrier = iLogPos - uv;
+    toBarrier.x *= inverseResolution.y / inverseResolution.x;
+    //vec4 fragColorN = vec4(0.0);
+    if(dot(toBarrier, toBarrier) < BarrierRadiusSq)
+    {
+        //fragColor = vec4(0.0, 0.0, 999.0, 0.0);
+        //fragColor = vec4(outputVelocity+0.1, 0.0, 0.0);
+        return texture(PressureTexture, pos).x+0.2;
     }
     
     // Boundary condition: Vanish for at walls.
@@ -41,7 +56,7 @@ float samplePressure(vec2 pos)
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-    inverseResolution = vec2(1.0) / iResolution.xy;
+    //inverseResolution = vec2(1.0) / iResolution.xy;
     border = inverseResolution * 2.0;
     //uv = fragCoord.xy * inverseResolution;
     

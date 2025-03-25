@@ -7,8 +7,9 @@ from panda3d.bullet import BulletWorld, BulletPlaneShape, BulletRigidBodyNode
 from panda3d.core import Filename
 from panda3d.core import PNMImage
 from panda3d.bullet import BulletHeightfieldShape
-from panda3d.bullet import ZUp
+from panda3d.bullet import ZUp, XUp, YUp
 from panda3d.bullet import BulletDebugNode
+from panda3d.bullet import BulletCapsuleShape, BulletRigidBodyNode
 # Load configuration settings to show buffers
 loadPrcFileData("", "show-buffers t")
 
@@ -40,21 +41,26 @@ class ShaderToyApp(ShowBase):
         self.cards['A'].set_shader_input("gimpriver", sample_texture)
         self.cards['A'].set_shader_input("gimpgradient", self.sample_texture_gimp_gradient)
         self.cards['A'].set_shader_input("iChannel3", self.textures['D'])
+        self.cards['A'].set_shader_input("iLogPos", (0,0))
 
         self.cards['B'].set_shader_input("iChannel0", self.textures['A'])
 
         self.cards['C'].set_shader_input("iChannel0", self.textures['A'])
         self.cards['C'].set_shader_input("iChannel1", self.textures['B'])
         self.cards['C'].set_shader_input("iChannel2", self.textures['C'])
+        self.cards['C'].set_shader_input("iLogPos", (0,0))
 
         self.cards['D'].set_shader_input("iChannel0", self.textures['A'])
         self.cards['D'].set_shader_input("iChannel2", self.textures['C'])
 
         self.taskMgr.add(self.update_shaders, "UpdateShadersTask")
         self.accept("v", self.bufferViewer.toggleEnable)
-        self.taskMgr.add(self.sampleVelField, "SampleVelFieldTask")
         
+
+        self.logs = []    
         self.setup_physics()
+        self.taskMgr.add(self.sampleVelField, "SampleVelFieldTask")
+        self.accept("l", self.spawnLog)
         
 
     
@@ -163,44 +169,9 @@ class ShaderToyApp(ShowBase):
         
         time = globalClock.get_frame_time()
         delta_time = globalClock.get_dt()
-        #print(delta_time)
-        
-        #self.buffers['B'].set_clear_color((0, 0, .2, 1))
-        self.cards['A'].set_shader_input("iTime", time*0+3.14/2)
+        self.cards['A'].set_shader_input("iTime", time)
         self.cards['A'].set_shader_input("iTimeDelta", delta_time)
-        #texture_copy = Texture()
-        #texture_copy = self.textures['A'].makeCopy()
-        #self.cards['A'].set_shader_input("iChannel3", self.textures['A'])
-        #self.cards['A'].set_shader_input("iChannel3", texture_copy)
-        
-
-        """ self.cards['B'].set_shader_input("iChannel0", self.textures['A'])
-
-        self.cards['C'].set_shader_input("iChannel0", self.textures['A'])
-        self.cards['C'].set_shader_input("iChannel1", self.textures['B'])
-        self.cards['C'].set_shader_input("iChannel2", self.textures['C']) """
-        
-        #self.quad.set_shader_input("iTime", time)
-        #self.quad.set_shader_input("iTimeDelta", delta_time)
-        #self.quad.set_shader_input("iChannel0", self.textures['A'])
-        #self.quad.set_shader_input("iChannel0", self.buffers['A'].getTexture())
-        #self.quad.set_shader_input("iChannel1", self.textures['B'])
-        #self.quad.set_shader_input("iChannel2", self.textures['C'])
-        #self.quad.set_shader_input("iChannel3", self.textures['A'])
-
-
-        """ self.cards['A'].set_shader_input("iChannel3", self.textures['D'])
-
-        self.cards['B'].set_shader_input("iChannel0", self.textures['A'])
-
-        self.cards['C'].set_shader_input("iChannel0", self.textures['A'])
-        self.cards['C'].set_shader_input("iChannel1", self.textures['B'])
-        self.cards['C'].set_shader_input("iChannel2", self.textures['C'])
-
-        self.cards['D'].set_shader_input("iChannel0", self.textures['A'])
-        self.cards['D'].set_shader_input("iChannel2", self.textures['C']) """
-        
-        
+        #self.cards['A'].set_shader_input("iLogPos", delta_time)
         return task.cont
     
     def sampleVelField(self, task):
@@ -223,7 +194,29 @@ class ShaderToyApp(ShowBase):
             # Access just the RGB components
             x=15
             y=128
-            #print(f"Pixel at ({x},{y}): {pixel_data[y, x, :3]}")  # Just RGB (y,x)
+            
+            
+            for n,log in enumerate(self.logs):
+                #x=int(3*256/2 + log.get_x())
+                #y=int(256/2 + log.get_y())
+                def scale(value, src_min, src_max, dst_min, dst_max):
+                    return dst_min + (value - src_min) * (dst_max - dst_min) / (src_max - src_min)
+
+                scaled_x = scale(log.get_x(), -3*64/2, 3*64/2, 0, 3*256)
+                scaled_y = scale(log.get_y(), -64/2, 64/2, 0, 256)
+                x = int(scaled_x)
+                y = int(scaled_y)
+                if x < 0 or x >= 3*256 or y < 0 or y >= 256:
+                    continue
+                if n==len(self.logs)-1:
+                    self.cards['C'].set_shader_input("iLogPos", (scaled_x/3/256, scaled_y/256))
+                #log.node().set_linear_velocity((pixel_data[y, x, 2], pixel_data[y, x, 1], 0))
+                scalar = .1  # Define the scalar value
+                velocity = log.node().get_linear_velocity()
+                velocity_limit = 15.0  # Define the velocity limit
+                if velocity.length() < velocity_limit:
+                    log.node().apply_central_impulse((pixel_data[y, x, 2] * scalar, pixel_data[y, x, 1] * scalar, 0))
+                print(f"log{n},{log.get_x()},{log.get_y()}, Pixel at ({x},{y}): {pixel_data[y, x, :3]}")  # Just RGB (y,x)
             
         return task.cont
     
@@ -232,6 +225,8 @@ class ShaderToyApp(ShowBase):
         # Create the Bullet physics world
         self.physics_world = BulletWorld()
         self.physics_world.set_gravity((0, 0, -9.81))
+        # Set default friction for the physics world
+        
 
         # Create a ground plane
         plane_shape = BulletPlaneShape((0, 0, 1), 0)  # Normal vector (0, 0, 1), offset 0
@@ -260,28 +255,9 @@ class ShaderToyApp(ShowBase):
     
     def bulletTerrain(self):
         # Create a terrain shape
-        """ terrain_shape = BulletHeightfieldShape(
-            np.array([[0, 0, 0], [0, 0, 0], [0, 0, 0]]),
-            1, False, False, True
-        )
-        # Create a heightfield
-        size = 64
-        height_data = np.zeros((size, size), dtype=np.float32)
-        # Fill height_data with your terrain heights
-
-        # Create the shape
-        heightfield_shape = BulletHeightfieldShape(
-            height_data, 1.0,  # Height scale
-            -10, 10,  # Min/max heights
-            up="z"  # Up axis
-        )
-         """
         height = 10.0
         img = PNMImage(Filename('assets/riversInspo/03_gimpriver_scaled.png'))
         shape = BulletHeightfieldShape(img, height, ZUp)
-        #shape = BulletHeightfieldShape(self.sample_texture_gimp_gradient, height, ZUp)
-
-
         # Create a terrain node
         terrain_node = BulletRigidBodyNode('Terrain')
         terrain_node.add_shape(shape)
@@ -289,6 +265,39 @@ class ShaderToyApp(ShowBase):
         terrain_np.set_pos(0, 0, 0)
         self.physics_world.attach(terrain_node)
         return terrain_np
+    
+    def add_collision_capsule(self):
+
+        # Create a capsule shape
+        radius = 0.5
+        height = 2.0
+        capsule_shape = BulletCapsuleShape(radius, height, YUp)
+
+        # Create a rigid body node for the capsule
+        capsule_node = BulletRigidBodyNode('Capsule')
+        capsule_node.add_shape(capsule_shape)
+        capsule_node.set_mass(10.0)  # Set the mass of the capsule
+        capsule_node.set_friction(0.05)  # Set the friction of the capsule
+        # Control the bounce factor (0.0 to 1.0)
+        capsule_node.set_restitution(0.4)  # Higher values = bouncier
+
+        # Attach the capsule to the scene
+        capsule_np = self.render.attach_new_node(capsule_node)
+        #capsule_np.set_pos(-3*64/2, -9, 12)  # Position at the origin
+        capsule_np.set_pos(0, 0, 1)  # Position at the origin
+        # Set the initial velocity of the capsule
+        capsule_node.set_linear_velocity((1, 0, 0))  # Velocity in the x-direction
+        capsule_node.set_angular_velocity((0, 0, 0))  # No angular velocity
+
+        # Add the capsule to the physics world
+        self.physics_world.attach(capsule_node)
+
+        return capsule_np
+    
+    def spawnLog(self):
+        self.logs.append(self.add_collision_capsule())
+        return
+
     
 
     

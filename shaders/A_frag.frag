@@ -6,6 +6,7 @@ uniform float iTimeDelta;
 uniform float iTime;
 uniform sampler2D gimpriver;
 uniform sampler2D gimpgradient;
+//uniform vec2 iLogPos;
 
 in vec2 uv;
 out vec4 gl_FragColor;
@@ -13,13 +14,13 @@ out vec4 gl_FragColor;
 // Advection & force
 
 // Magic force within a rectangle.
-const vec2 Force = vec2(75.0, 0.0);
+const vec2 Force = vec2(5.0, 0.0);
 const vec2 ForceAreaMin = vec2(0.0, 0.2); 
 const vec2 ForceAreaMax = vec2(0.06, 0.8);
 
 // Circular barrier.
 vec2 BarrierPosition = vec2(0.2, 0.5);
-const float BarrierRadiusSq = 0.01;
+const float BarrierRadiusSq = 0.0005;
 
 #define VelocityTexture iChannel3
 
@@ -72,12 +73,14 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     // Circle barrier.
 
     BarrierPosition = vec2(1.2, abs(sin(iTime))/2);
+    //BarrierPosition = iLogPos;
     vec2 toBarrier = BarrierPosition - uv;
     toBarrier.x *= inverseResolution.y / inverseResolution.x;
     //vec4 fragColorN = vec4(0.0);
     if(dot(toBarrier, toBarrier) < BarrierRadiusSq)
     {
         fragColor = vec4(0.0, 0.0, 999.0, 0.0);
+        //fragColor = vec4(outputVelocity+0.1, 0.0, 0.0);
     }
     else if (texture(gimpriver, uv).x > 0.0)
     {
