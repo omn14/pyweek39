@@ -5,7 +5,11 @@ uniform sampler2D iChannel0;
 uniform sampler2D iChannel1;
 uniform sampler2D iChannel2;
 //uniform float iTimeDelta;
-uniform vec2 iLogPos;
+uniform vec2 iMousePos;
+#define MAX_LOGS 200
+uniform int array_length;
+uniform vec2 iLogPos[MAX_LOGS];
+uniform float iLogVelocities[MAX_LOGS];
 in vec2 uv;
 out vec4 gl_FragColor;
 
@@ -30,16 +34,30 @@ float samplePressure(vec2 pos)
         return 0.0;
     }
 
-    //BarrierPosition = vec2(1.2, abs(sin(iTime))/2);
-    //BarrierPosition = iLogPos;
-    vec2 toBarrier = iLogPos - uv;
+    //mouse
+    vec2 toBarrier = iMousePos - uv;
     toBarrier.x *= inverseResolution.y / inverseResolution.x;
     //vec4 fragColorN = vec4(0.0);
     if(dot(toBarrier, toBarrier) < BarrierRadiusSq)
     {
         //fragColor = vec4(0.0, 0.0, 999.0, 0.0);
         //fragColor = vec4(outputVelocity+0.1, 0.0, 0.0);
-        return texture(PressureTexture, pos).x+0.2;
+        return texture(PressureTexture, pos).x+0.9;
+    }
+
+    for (int i = 0; i < MAX_LOGS; i++) {
+        //BarrierPosition = vec2(1.2, abs(sin(iTime))/2);
+        //BarrierPosition = iLogPos;
+        if (i >= array_length) break;
+        toBarrier = iLogPos[i] - uv;
+        toBarrier.x *= inverseResolution.y / inverseResolution.x;
+        //vec4 fragColorN = vec4(0.0);
+        if(dot(toBarrier, toBarrier) < BarrierRadiusSq)
+        {
+            //fragColor = vec4(0.0, 0.0, 999.0, 0.0);
+            //fragColor = vec4(outputVelocity+0.1, 0.0, 0.0);
+            return texture(PressureTexture, pos).x+0.2*iLogVelocities[i];
+        }
     }
     
     // Boundary condition: Vanish for at walls.
@@ -52,6 +70,8 @@ float samplePressure(vec2 pos)
     {
     	return texture(PressureTexture, pos).x;
     }
+
+
 }
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )

@@ -1,7 +1,8 @@
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import FrameBufferProperties, GraphicsOutput, Texture, Shader, WindowProperties, NodePath, CardMaker, GraphicsPipe, OrthographicLens
-from panda3d.core import loadPrcFileData
+from panda3d.core import loadPrcFileData, Point3
 from panda3d.core import AmbientLight, DirectionalLight, PointLight
+from panda3d.core import PTALVecBase2f, PTAFloat
 import numpy as np
 from panda3d.bullet import BulletWorld, BulletPlaneShape, BulletRigidBodyNode
 from panda3d.core import Filename
@@ -10,17 +11,26 @@ from panda3d.bullet import BulletHeightfieldShape
 from panda3d.bullet import ZUp, XUp, YUp
 from panda3d.bullet import BulletDebugNode
 from panda3d.bullet import BulletCapsuleShape, BulletRigidBodyNode
+import random
+from panda3d.core import TextNode, PNMImage, Texture, CardMaker
 # Load configuration settings to show buffers
 loadPrcFileData("", "show-buffers t")
 
-class ShaderToyApp(ShowBase):
+class riverApp(ShowBase):
     def __init__(self):
         super().__init__()
         # Enable the frame rate meter
         self.setFrameRateMeter(True)
+        # Set the window size to 720p
+        window_properties = WindowProperties()
+        window_properties.set_size(1280, 720)
+        self.win.request_properties(window_properties)
 
         # Disable default camera controls
-        #self.disableMouse()
+        self.disableMouse()
+
+        self.cam.set_pos(0, -25*4, 25*4*2)
+        self.cam.look_at(0, 0, 0)
 
         # Create buffers A, B, C, D
         self.buffers = {}
@@ -37,18 +47,29 @@ class ShaderToyApp(ShowBase):
         self.win.set_clear_color((1, 1, 1, 1))
         # Add the task to update shaders with time
         sample_texture = self.loader.loadTexture("assets/riversInspo/01_gimpriver.png")
-        self.sample_texture_gimp_gradient = self.loader.loadTexture("assets/riversInspo/02_gimpgradient.png")
+        self.sample_texture_gimp_gradient = self.loader.loadTexture("outfield.png")
         self.cards['A'].set_shader_input("gimpriver", sample_texture)
         self.cards['A'].set_shader_input("gimpgradient", self.sample_texture_gimp_gradient)
-        self.cards['A'].set_shader_input("iChannel3", self.textures['D'])
-        self.cards['A'].set_shader_input("iLogPos", (0,0))
+        self.cards['A'].set_shader_input("iChannel3", self.textures['D'])  
+        self.mouses = PTALVecBase2f()  
+        #self.mouses.push_back((0,0))
+        self.cards['A'].set_shader_input("iMousePoses", self.mouses)
+        self.numMouses = len(self.mouses)
+        self.cards['A'].set_shader_input("iMaxRocks", int(self.numMouses))    
 
         self.cards['B'].set_shader_input("iChannel0", self.textures['A'])
 
         self.cards['C'].set_shader_input("iChannel0", self.textures['A'])
         self.cards['C'].set_shader_input("iChannel1", self.textures['B'])
         self.cards['C'].set_shader_input("iChannel2", self.textures['C'])
-        self.cards['C'].set_shader_input("iLogPos", (0,0))
+        self.logPoses = PTALVecBase2f()
+        self.logVelocities = PTAFloat()
+        #self.logPoses.push_back((0,0))
+        self.lenlogPoses = len(self.logPoses)
+        self.cards['C'].set_shader_input("array_length", self.lenlogPoses)
+        self.cards['C'].set_shader_input("iLogPos", self.logPoses)
+        self.cards['C'].set_shader_input("iMousePos", (0,0))
+        self.cards['C'].set_shader_input("iLogVelocities", self.logVelocities)
 
         self.cards['D'].set_shader_input("iChannel0", self.textures['A'])
         self.cards['D'].set_shader_input("iChannel2", self.textures['C'])
@@ -58,9 +79,19 @@ class ShaderToyApp(ShowBase):
         
 
         self.logs = []    
+        self.random_numbers = [random.uniform(0.1, 2) for _ in range(200)]
         self.setup_physics()
         self.taskMgr.add(self.sampleVelField, "SampleVelFieldTask")
         self.accept("l", self.spawnLog)
+        self.taskMgr.add(self.mousePos, "MousePosTask")
+        self.rockTimer = 0
+
+        self.taskMgr.doMethodLater(3, self.auto_spawn_log, "AutoSpawnLogTask")
+        self.create_text_texture(["How to play:", 
+                                  "Left click for pressure disturbance", 
+                                  "Right click to spawn barrier", 
+                                  "Get as many logs to the end as possible",
+                                  "Longer logs score more points"])
         
 
     
@@ -172,6 +203,7 @@ class ShaderToyApp(ShowBase):
         self.cards['A'].set_shader_input("iTime", time)
         self.cards['A'].set_shader_input("iTimeDelta", delta_time)
         #self.cards['A'].set_shader_input("iLogPos", delta_time)
+        
         return task.cont
     
     def sampleVelField(self, task):
@@ -195,30 +227,50 @@ class ShaderToyApp(ShowBase):
             x=15
             y=128
             
-            
+            self.logPoses = PTALVecBase2f()
+            self.logVelocities = PTAFloat()
             for n,log in enumerate(self.logs):
+                
                 #x=int(3*256/2 + log.get_x())
                 #y=int(256/2 + log.get_y())
-                def scale(value, src_min, src_max, dst_min, dst_max):
-                    return dst_min + (value - src_min) * (dst_max - dst_min) / (src_max - src_min)
+                
 
-                scaled_x = scale(log.get_x(), -3*64/2, 3*64/2, 0, 3*256)
-                scaled_y = scale(log.get_y(), -64/2, 64/2, 0, 256)
+                scaled_x = self.scale(log.get_x(), -3*64/2, 3*64/2, 0, 3*256)
+                scaled_y = self.scale(log.get_y(), -64/2, 64/2, 0, 256)
                 x = int(scaled_x)
                 y = int(scaled_y)
                 if x < 0 or x >= 3*256 or y < 0 or y >= 256:
                     continue
-                if n==len(self.logs)-1:
-                    self.cards['C'].set_shader_input("iLogPos", (scaled_x/3/256, scaled_y/256))
+                #if n==len(self.logs)-1:
+                #    self.cards['C'].set_shader_input("iLogPos", (scaled_x/3/256, scaled_y/256))
+                self.logPoses.push_back((scaled_x/3/256, scaled_y/256))
                 #log.node().set_linear_velocity((pixel_data[y, x, 2], pixel_data[y, x, 1], 0))
-                scalar = .1  # Define the scalar value
+                scalar = .05  # Define the scalar value
                 velocity = log.node().get_linear_velocity()
                 velocity_limit = 15.0  # Define the velocity limit
+                self.logVelocities.push_back(min(velocity.length(),15)/15)
                 if velocity.length() < velocity_limit:
                     log.node().apply_central_impulse((pixel_data[y, x, 2] * scalar, pixel_data[y, x, 1] * scalar, 0))
-                print(f"log{n},{log.get_x()},{log.get_y()}, Pixel at ({x},{y}): {pixel_data[y, x, :3]}")  # Just RGB (y,x)
+                #print(f"log{n},{log.get_x()},{log.get_y()}, Pixel at ({x},{y}): {pixel_data[y, x, :3]}")  # Just RGB (y,x)
+                
+
+            self.lenlogPoses = len(self.logPoses)
+            self.cards['C'].set_shader_input("array_length", self.lenlogPoses)
+            self.cards['C'].set_shader_input("iLogPos", self.logPoses)
+            """ max_velocity = max(self.logVelocities) if self.logVelocities else 1.0
+            min_velocity = min(self.logVelocities) if self.logVelocities else 0.0
+            normalized_velocities = PTAFloat()
+            for velocity in self.logVelocities:
+                normalized_velocity = (velocity - min_velocity) / (max_velocity - min_velocity)
+                normalized_velocities.push_back(normalized_velocity)
+            self.logVelocities = normalized_velocities """
+            self.cards['C'].set_shader_input("iLogVelocities", self.logVelocities)
+
             
         return task.cont
+    
+    def scale(self, value, src_min, src_max, dst_min, dst_max):
+        return dst_min + (value - src_min) * (dst_max - dst_min) / (src_max - src_min)
     
     def setup_physics(self):
 
@@ -270,7 +322,8 @@ class ShaderToyApp(ShowBase):
 
         # Create a capsule shape
         radius = 0.5
-        height = 2.0
+        #height = 2.0
+        height = 2.0*self.random_numbers[self.lenlogPoses]
         capsule_shape = BulletCapsuleShape(radius, height, YUp)
 
         # Create a rigid body node for the capsule
@@ -283,8 +336,8 @@ class ShaderToyApp(ShowBase):
 
         # Attach the capsule to the scene
         capsule_np = self.render.attach_new_node(capsule_node)
-        #capsule_np.set_pos(-3*64/2, -9, 12)  # Position at the origin
-        capsule_np.set_pos(0, 0, 1)  # Position at the origin
+        capsule_np.set_pos(-3*64/2, -9, 12)  # Position at the origin
+        #capsule_np.set_pos(0, 0, 1)  # Position at the origin
         # Set the initial velocity of the capsule
         capsule_node.set_linear_velocity((1, 0, 0))  # Velocity in the x-direction
         capsule_node.set_angular_velocity((0, 0, 0))  # No angular velocity
@@ -296,12 +349,124 @@ class ShaderToyApp(ShowBase):
     
     def spawnLog(self):
         self.logs.append(self.add_collision_capsule())
+        #self.textures['A'].write("outfield.png")
         return
+    
+    def mousePos(self,task):
+        time = task.time
+        #surface.setZ(0+sin(time)*3)
+        if base.mouseWatcherNode.hasMouse() and (base.mouseWatcherNode.is_button_down("mouse1") or base.mouseWatcherNode.is_button_down("mouse3")) and self.rockTimer < 60:
+            x = base.mouseWatcherNode.getMouseX()
+            y = base.mouseWatcherNode.getMouseY()
+            #print(x,y)
+            #surface.set_shader_input("pos", Vec3(base.mouseWatcherNode.getMouseX(),0,base.mouseWatcherNode.getMouseY())*4)
+            #pFrom = Point3(0, 0, 0)
+            #pTo = Point3(10, 0, 0)
+
+            # Get to and from pos in camera coordinates
+            pMouse = base.mouseWatcherNode.getMouse()
+            pFrom = Point3()
+            pTo = Point3()
+            base.camLens.extrude(pMouse, pFrom, pTo)
+
+            # Transform to global coordinates
+            pFrom = render.getRelativePoint(base.cam, pFrom)
+            pTo = render.getRelativePoint(base.cam, pTo)
+
+            result = self.physics_world.rayTestClosest(pFrom, pTo)
+
+            print(result.hasHit())
+            print(result.getHitPos())
+            print(result.getHitNormal())
+            print(result.getHitFraction())
+            print(result.getNode())
+            scaled_x = self.scale(result.getHitPos().x, -3*64/2, 3*64/2, 0, 3*256)
+            scaled_y = self.scale(result.getHitPos().y, -64/2, 64/2, 0, 256)
+            x = scaled_x/3/256
+            y = scaled_y/256
+            if base.mouseWatcherNode.is_button_down("mouse1"):
+                self.cards['C'].set_shader_input("iMousePos", (x,y))
+                self.taskMgr.doMethodLater(1, self.rockUpdate, "RockUpdateTask")
+            if base.mouseWatcherNode.is_button_down("mouse3"):
+                #self.cards['A'].set_shader_input("iMousePos", (x,y))
+                self.mouses.push_back((x,y))
+                self.numMouses = len(self.mouses)
+                #self.cards['A'].set_shader_input("iMaxRocks", int(self.numMouses))
+                #self.cards['A'].set_shader_input("iMousePoses", self.mouses)
+                self.taskMgr.doMethodLater(0.5, self.updateRocks, "Ru")
+                self.taskMgr.doMethodLater(1, self.rockUpdate, "RockUpdateTask")
+                cap = self.add_collision_capsule()
+                cap.set_pos(result.getHitPos().x, result.getHitPos().y, 0)
+                cap.set_hpr(0,90,0)
+                cap.node().set_mass(0)
+            self.rockTimer = 100
+        return task.cont
+    
+    def rockUpdate(self,task):
+        self.rockTimer = 0
+        self.cards['C'].set_shader_input("iMousePos", (1000,1000))
+        return task.done
+    
+    def updateRocks(self,task):
+        #self.cards['A'].set_shader_input("iMaxRocks", int(len(self.mouses)))
+        #self.cards['A'].set_shader_input("iMousePoses", self.mouses)
+        self.cards['A'].set_shader_inputs(
+            iMaxRocks = int(len(self.mouses)),
+            iMousePoses = self.mouses
+        )
+        return task.done
+    
+    def auto_spawn_log(self, task):
+        self.spawnLog()
+        return task.again
+    
+    def create_text_texture(self, text_lines):
+
+        # Create a TextNode to hold the text
+        text_node = TextNode("text_node")
+        text_node.set_text("\n".join(text_lines))
+        text_node.set_text_color(1, 1, 1, 1)  # White text
+        #text_node.set_align(TextNode.A_center)
+        text_node.set_card_color(0, 0, 0, 1)  # Black background
+        text_node.set_card_as_margin(0.2, 0.2, 0.2, 0.2)
+        text_node.set_card_decal(True)
+
+        # Create a NodePath for the TextNode
+        text_np = self.aspect2d.attach_new_node(text_node)
+        text_np.set_scale(0.05)  # Scale the text
+        text_np.set_pos(-0.8, 0, 0.8)
+
+        """ # Render the text to a texture
+        tex = Texture()
+        pnm_image = PNMImage(512, 512)
+        buffer = self.win.make_texture_buffer("text_buffer", 512, 512)
+        buffer.set_clear_color((0, 0, 0, 1))
+        camera = self.make_camera(buffer)
+        camera.reparent_to(self.aspect2d)
+        camera.node().get_display_region(0).set_clear_color_active(True)
+        camera.node().get_display_region(0).set_clear_color((0, 0, 0, 1))
+        camera.node().set_scene(text_np)
+        tex = buffer.get_texture()
+
+        # Create a card to display the texture
+        card_maker = CardMaker("text_card")
+        card_maker.set_frame(-1, 1, -1, 1)
+        card_np = self.render.attach_new_node(card_maker.generate())
+        card_np.set_texture(tex)
+        card_np.set_pos(0, 0, 0)  # Position the card in the scene
+        #card_np. """
+
+        #return card_np
+        return
+        
+    
+    
+
 
     
 
     
 
 if __name__ == "__main__":
-    app = ShaderToyApp()
+    app = riverApp()
     app.run()
