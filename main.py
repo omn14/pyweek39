@@ -14,7 +14,8 @@ from panda3d.bullet import BulletCapsuleShape, BulletRigidBodyNode
 import random
 from panda3d.core import TextNode, PNMImage, Texture, CardMaker
 # Load configuration settings to show buffers
-loadPrcFileData("", "show-buffers t")
+#loadPrcFileData("", "show-buffers t")
+loadPrcFileData("", "notify-level-info")
 
 class riverApp(ShowBase):
     def __init__(self):
@@ -375,11 +376,11 @@ class riverApp(ShowBase):
 
             result = self.physics_world.rayTestClosest(pFrom, pTo)
 
-            print(result.hasHit())
+            """ print(result.hasHit())
             print(result.getHitPos())
             print(result.getHitNormal())
             print(result.getHitFraction())
-            print(result.getNode())
+            print(result.getNode()) """
             scaled_x = self.scale(result.getHitPos().x, -3*64/2, 3*64/2, 0, 3*256)
             scaled_y = self.scale(result.getHitPos().y, -64/2, 64/2, 0, 256)
             x = scaled_x/3/256
