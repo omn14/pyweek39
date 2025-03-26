@@ -11,7 +11,7 @@ uniform int array_length;
 uniform vec2 iLogPos[MAX_LOGS];
 uniform float iLogVelocities[MAX_LOGS];
 in vec2 uv;
-out vec4 gl_FragColor;
+out vec4 fragColor;
 
 // Jacobi iteration
 // For a more accurate result, this should be executed multiple times.
@@ -21,10 +21,11 @@ out vec4 gl_FragColor;
 #define VelocityTexture iChannel0
 
 //vec2 inverseResolution;
-vec2 border;
+//vec2 border;
 //vec2 uv;
 vec2 inverseResolution = vec2(1.0) / iResolution.xy;
 const float BarrierRadiusSq = 0.001;
+vec2 border = inverseResolution * 2.0;
 
 float samplePressure(vec2 pos)
 {
@@ -97,5 +98,5 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
 void main()
 {
-    mainImage(gl_FragColor, uv);
+    mainImage(fragColor, uv);
 }

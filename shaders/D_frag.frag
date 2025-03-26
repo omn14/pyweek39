@@ -6,7 +6,7 @@ uniform sampler2D iChannel0;
 uniform sampler2D iChannel2;
 //uniform float iTimeDelta;
 in vec2 uv;
-out vec4 gl_FragColor;
+out vec4 fragColor;
 
 // Subtract pressure gradient to ensure zero divergence.
 
@@ -30,5 +30,5 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 
 void main()
 {
-    mainImage(gl_FragColor, uv);
+    mainImage(fragColor, uv);
 }
