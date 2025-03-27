@@ -4,7 +4,7 @@ from panda3d.core import loadPrcFileData, Point3
 from panda3d.core import AmbientLight, DirectionalLight, PointLight
 from panda3d.core import PTALVecBase2f, PTAFloat
 import numpy as np
-from panda3d.bullet import BulletWorld, BulletPlaneShape, BulletRigidBodyNode
+from panda3d.bullet import BulletWorld, BulletPlaneShape, BulletRigidBodyNode, BulletBoxShape
 from panda3d.core import Filename
 from panda3d.core import PNMImage
 from panda3d.bullet import BulletHeightfieldShape
@@ -13,6 +13,7 @@ from panda3d.bullet import BulletDebugNode
 from panda3d.bullet import BulletCapsuleShape, BulletRigidBodyNode
 import random
 from panda3d.core import TextNode, PNMImage, Texture, CardMaker
+from panda3d.core import BitMask32
 # Load configuration settings to show buffers
 #loadPrcFileData("", "show-buffers t")
 loadPrcFileData("", "notify-level-info")
@@ -286,25 +287,79 @@ class riverApp(ShowBase):
         ground_node = BulletRigidBodyNode('Ground')
         ground_node.add_shape(plane_shape)
         ground_np = self.render.attach_new_node(ground_node)
-        ground_np.set_pos(0, 0, 0)
+        ground_np.set_pos(1000, 0, 0)
         self.physics_world.attach(ground_node)
-        self.bulletTerrain()
+        terrain_np = self.bulletTerrain()
+        #self.goalBox = self.add_collision_box()
+        self.goalBox = self.add_collision_box(whatbox='outBox',pos=(76, 32, 1),half_extents=(17.5, 5.5, 10.5),t=["Outfield", "Score: 0"])
+        self.goalBox_neg1 = self.add_collision_box(whatbox='negBox1',pos=(-50, 32, 1),half_extents=(17.5, 5.5, 10.5),t=["Outfield", "Score: 0"])
+        self.goalBox_neg2 = self.add_collision_box(whatbox='negBox2',pos=(10, -40, 1),half_extents=(17.5, 5.5, 10.5),t=["Outfield", "Score: 0"])
+
+        self.goals = []
+        self.goals.append(self.goalBox)
+        self.goals.append(self.goalBox_neg1)
+        self.goals.append(self.goalBox_neg2)
         # Create a debug node
         debug_node = BulletDebugNode('Debug')
         debug_node.show_wireframe(True)
         debug_node.show_constraints(True)
         debug_node.show_bounding_boxes(False)
         debug_node.show_normals(False)
+        #debug_node.show_axes(False)
         debug_np = self.render.attach_new_node(debug_node)
         debug_np.show()
         self.physics_world.set_debug_node(debug_node)  
+
         # Add a task to update the physics simulation
+        self.logsInGoal = []
+        l1=[]
+        l2=[]
+        l3=[]
+        self.logsInGoal.append(l1)
+        self.logsInGoal.append(l2)
+        self.logsInGoal.append(l3)
+        self.lig = {}
+        self.lig['outBox'] = []
+        self.lig['negBox1'] = []
+        self.lig['negBox2'] = []
         self.taskMgr.add(self.update_physics, "UpdatePhysicsTask")
 
     def update_physics(self, task):
         dt = globalClock.get_dt()
         self.physics_world.do_physics(dt)
+        for goal in self.goals:
+            result = self.physics_world.contact_test(goal.node())
+            for contact in result.getContacts():
+                self.goalCol(contact)
         return task.cont
+    
+    def goalCol(self,contact):
+        if "Terrain" in contact.getNode1().getName():
+            return
+        if "Ground" in contact.getNode1().getName():
+            return
+        if contact.getNode1() in self.logsInGoal:
+            return
+        self.logsInGoal.append(contact.getNode1())
+        self.lig[contact.getNode0().getName()].append(contact.getNode1())
+        #if "outBox" in contact.getNode0().getName():
+            #self.goal_text_node.set_text("\n".join(["Outfield", f"Score: {len(self.logsInGoal)}"]))
+        #contact.getNode0().get_parent(0).find('**/*text*').node().set_text("\n".join(["Outfield", f"Score: {len(self.logsInGoal)}"]))
+        #contact.getNode0().get_child(0).set_text("\n".join(["Outfield", f"Score: {len(self.logsInGoal)}"]))
+        contact.getNode0().get_child(0).set_text("\n".join(["Outfield", f"Score: {len(self.lig[contact.getNode0().getName()])}"]))
+
+        #contact.getNode1().set_into_collide_mask(BitMask32.all_off())
+
+        print(contact.getNode0())
+        print(contact.getNode1())
+
+        mpoint = contact.getManifoldPoint()
+        print(mpoint.getDistance())
+        print(mpoint.getAppliedImpulse())
+        print(mpoint.getPositionWorldOnA())
+        print(mpoint.getPositionWorldOnB())
+        print(mpoint.getLocalPointA())
+        print(mpoint.getLocalPointB())
     
     def bulletTerrain(self):
         # Create a terrain shape
@@ -348,6 +403,44 @@ class riverApp(ShowBase):
 
         return capsule_np
     
+    def add_collision_box(self,whatbox='outBox',pos=(-50, 32, 1),half_extents=(17.5, 5.5, 10.5),t=["Outfield", "Score: 0"]):
+
+        # Create a box shape
+        #half_extents = ()
+        box_shape = BulletBoxShape(half_extents)
+
+        # Create a rigid body node for the box
+        box_node = BulletRigidBodyNode(whatbox)
+        box_node.add_shape(box_shape)
+        box_node.set_mass(0.0)
+        box_node.set_kinematic(True)  # Make the box kinematic (non-solid but still registers collisions)
+        box_node.set_into_collide_mask(BitMask32.all_off())
+
+        # Attach the box to the scene
+        box_np = self.render.attach_new_node(box_node)
+        #box_np.set_pos(76, 32, 1)  
+        box_np.set_pos(pos)  
+        #box_np.set_hpr(45, 0, 0)  # No rotation
+
+        # Add the box to the physics world
+        self.physics_world.attach(box_node)
+
+        goal_text_node = TextNode("text_node")
+        goal_text_node.set_text("\n".join(t))
+        goal_text_node.set_text_color(1, 1, 1, 1)  # White text
+        #text_node.set_align(TextNode.A_center)
+        goal_text_node.set_card_color(0, 0, 0, 1)  # Black background
+        goal_text_node.set_card_as_margin(0.2, 3.2, 0.2, 0.2)
+        goal_text_node.set_card_decal(True)
+
+        # Create a NodePath for the TextNode
+        text_np = box_np.attach_new_node(goal_text_node)
+        text_np.set_scale(5.0)  # Scale the text
+        text_np.set_pos(-17.5, 0, 10.8)
+        text_np.set_hpr(0, -90, 0)
+        
+        return box_np
+    
     def spawnLog(self):
         self.logs.append(self.add_collision_capsule())
         #self.textures['A'].write("outfield.png")
@@ -376,11 +469,11 @@ class riverApp(ShowBase):
 
             result = self.physics_world.rayTestClosest(pFrom, pTo)
 
-            """ print(result.hasHit())
+            print(result.hasHit())
             print(result.getHitPos())
             print(result.getHitNormal())
             print(result.getHitFraction())
-            print(result.getNode()) """
+            print(result.getNode())
             scaled_x = self.scale(result.getHitPos().x, -3*64/2, 3*64/2, 0, 3*256)
             scaled_y = self.scale(result.getHitPos().y, -64/2, 64/2, 0, 256)
             x = scaled_x/3/256
@@ -427,15 +520,16 @@ class riverApp(ShowBase):
         text_node = TextNode("text_node")
         text_node.set_text("\n".join(text_lines))
         text_node.set_text_color(1, 1, 1, 1)  # White text
-        #text_node.set_align(TextNode.A_center)
+        text_node.set_align(TextNode.A_center)
         text_node.set_card_color(0, 0, 0, 1)  # Black background
         text_node.set_card_as_margin(0.2, 0.2, 0.2, 0.2)
         text_node.set_card_decal(True)
 
         # Create a NodePath for the TextNode
-        text_np = self.aspect2d.attach_new_node(text_node)
-        text_np.set_scale(0.05)  # Scale the text
-        text_np.set_pos(-0.8, 0, 0.8)
+        text_np = self.render.attach_new_node(text_node)
+        text_np.set_scale(4.0)  # Scale the text
+        text_np.set_pos(-60.0, -40, 0)
+        text_np.set_hpr(0, -90, 0)
 
         """ # Render the text to a texture
         tex = Texture()
