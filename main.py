@@ -88,15 +88,61 @@ class riverApp(ShowBase):
         self.taskMgr.add(self.mousePos, "MousePosTask")
         self.rockTimer = 0
 
-        self.taskMgr.doMethodLater(3, self.auto_spawn_log, "AutoSpawnLogTask")
+        #self.taskMgr.doMethodLater(3, self.auto_spawn_log, "AutoSpawnLogTask")
         self.create_text_texture(["How to play:", 
                                   "Left click for pressure disturbance", 
                                   "Right click to spawn barrier", 
                                   "Get as many logs to the end as possible",
                                   "Longer logs score more points"])
         
+        self.MoneyInBank = 100.0
+        self.MoneySpent = 0.0
+        self.MoneyEarned = 0.0
+        self.LogsDelivered = 0
+        self.LogsLost = 0
+        self.scoreKeep = self.create_text_texture([f"Money in bank: {self.MoneyInBank:.2f}",
+                             f"Money spent: {self.MoneySpent:.2f}",
+                             f"Money earned: {self.MoneyEarned:.2f}",
+                             f"Logs delivered: {self.LogsDelivered}",
+                             f"Total Logs lost: {self.LogsLost}"])
+        
+        self.scoreKeep.set_pos(60.0, -40, 0)
 
-    
+        self.waveNr = 0
+        self.nextWaveTime = 10
+        self.nextWaveCost = 100
+        minutes, seconds = divmod(self.nextWaveTime, 60)
+        self.waveKeep = self.create_text_texture([f"Wave: {self.waveNr}",
+                                                  f"Next wave in: {int(minutes)}:{int(seconds):02d}",
+                                                  f"Next wave Cost: {self.nextWaveCost:.2f}"])
+        self.waveKeep.set_pos(65.0, -20, 12)
+        self.taskMgr.add(self.waveControler, "WaveControlerTask")
+
+    def waveControler(self,task):
+        task.delayTime = 1
+        self.nextWaveTime -= 1
+        minutes, seconds = divmod(self.nextWaveTime, 60)
+        self.waveKeep.node().set_text("\n".join([f"Wave: {self.waveNr}",
+                              f"Next wave in: {int(minutes)}:{int(seconds):02d}",
+                              f"Next wave Cost: {self.nextWaveCost:.2f}"]))
+        if self.nextWaveTime <= 0:
+            self.waveNr += 1
+            self.nextWaveTime = 100
+            self.nextWaveCost = 10
+            self.taskMgr.doMethodLater(3, self.auto_spawn_log, "AutoSpawnLogTask")
+            self.MoneyInBank = self.MoneyInBank + self.MoneyEarned - self.nextWaveCost
+            self.MoneyEarned = 0.0
+            self.MoneySpent += self.nextWaveCost
+            self.updateScore()
+            
+        return task.again
+
+    def updateScore(self):
+        self.scoreKeep.node().set_text("\n".join([f"Money in bank: {self.MoneyInBank:.2f}",
+                             f"Money spent: {self.MoneySpent:.2f}",
+                             f"Money earned: {self.MoneyEarned:.2f}",
+                             f"Logs delivered: {self.LogsDelivered}",
+                             f"Total Logs lost: {self.LogsLost}"]))
 
     def create_buffer(self, name):
         """ mybuffer = base.win.makeTextureBuffer(name, 512, 512)
@@ -291,10 +337,11 @@ class riverApp(ShowBase):
         self.physics_world.attach(ground_node)
         terrain_np = self.bulletTerrain()
         #self.goalBox = self.add_collision_box()
-        self.goalBox = self.add_collision_box(whatbox='outBox',pos=(76, 32, 1),half_extents=(17.5, 5.5, 10.5),t=["Outfield", "Score: 0"])
-        self.goalBox_neg1 = self.add_collision_box(whatbox='negBox1',pos=(-50, 32, 1),half_extents=(17.5, 5.5, 10.5),t=["Outfield", "Score: 0"])
-        self.goalBox_neg2 = self.add_collision_box(whatbox='negBox2',pos=(10, -40, 1),half_extents=(17.5, 5.5, 10.5),t=["Outfield", "Score: 0"])
-
+        self.goalBox = self.add_collision_box(whatbox='outBox',pos=(76, 32, 1),half_extents=(17.5, 5.5, 10.5),t=["Goal, Sawmill", "Score: 0"])
+        self.goalBox_neg1 = self.add_collision_box(whatbox='negBox1',pos=(-50, 32, 1),half_extents=(17.5, 5.5, 10.5),t=[f"Lost logs: 0"])
+        self.goalBox_neg2 = self.add_collision_box(whatbox='negBox2',pos=(10, -40, 1),half_extents=(17.5, 5.5, 10.5),t=[f"Lost logs: 0"])
+        
+        #self.goalBox_neg1.get_child(0).setTransparency(True)
         self.goals = []
         self.goals.append(self.goalBox)
         self.goals.append(self.goalBox_neg1)
@@ -322,6 +369,12 @@ class riverApp(ShowBase):
         self.lig['outBox'] = []
         self.lig['negBox1'] = []
         self.lig['negBox2'] = []
+        self.goalBox_neg1.node().get_child(0).set_text_color(1, 0, 0, 1)  # Set color to red
+        self.goalBox_neg1.node().get_child(0).set_card_color(1, 0, 0, 0)  # Black background
+        self.goalBox_neg1.node().get_child(0).set_text("\n".join([f"Lost logs: {len(self.lig[self.goalBox_neg1.node().getName()])}"]))
+        self.goalBox_neg2.node().get_child(0).set_text_color(1, 0, 0, 1)  # Set color to red
+        self.goalBox_neg2.node().get_child(0).set_card_color(1, 0, 0, 0)  # Black background
+        self.goalBox_neg2.node().get_child(0).set_text("\n".join([f"Lost logs: {len(self.lig[self.goalBox_neg2.node().getName()])}"]))
         self.taskMgr.add(self.update_physics, "UpdatePhysicsTask")
 
     def update_physics(self, task):
@@ -346,8 +399,20 @@ class riverApp(ShowBase):
             #self.goal_text_node.set_text("\n".join(["Outfield", f"Score: {len(self.logsInGoal)}"]))
         #contact.getNode0().get_parent(0).find('**/*text*').node().set_text("\n".join(["Outfield", f"Score: {len(self.logsInGoal)}"]))
         #contact.getNode0().get_child(0).set_text("\n".join(["Outfield", f"Score: {len(self.logsInGoal)}"]))
-        contact.getNode0().get_child(0).set_text("\n".join(["Outfield", f"Score: {len(self.lig[contact.getNode0().getName()])}"]))
+        if 'neg' in contact.getNode0().getName():
+            contact.getNode0().get_child(0).set_text("\n".join([f"Lost logs: {len(self.lig[contact.getNode0().getName()])}"]))
+            contact.getNode0().get_child(0).set_text_color(1, 0, 0, 1)  # Set color to red
+            contact.getNode0().get_child(0).set_card_color(1, 0, 0, 0)  # Black background
+            self.LogsLost += 1
+            
+            
+        else:
+            contact.getNode0().get_child(0).set_text("\n".join(["Goal, Sawmill", f"Score: {len(self.lig[contact.getNode0().getName()])}"]))
+            self.LogsDelivered += 1
+            self.MoneyEarned += contact.getNode1().get_mass()
 
+        
+        self.updateScore()
         #contact.getNode1().set_into_collide_mask(BitMask32.all_off())
 
         print(contact.getNode0())
@@ -385,7 +450,7 @@ class riverApp(ShowBase):
         # Create a rigid body node for the capsule
         capsule_node = BulletRigidBodyNode('Capsule')
         capsule_node.add_shape(capsule_shape)
-        capsule_node.set_mass(10.0)  # Set the mass of the capsule
+        capsule_node.set_mass(7.5*self.random_numbers[self.lenlogPoses])  # Set the mass of the capsule
         capsule_node.set_friction(0.05)  # Set the friction of the capsule
         # Control the bounce factor (0.0 to 1.0)
         capsule_node.set_restitution(0.4)  # Higher values = bouncier
@@ -511,7 +576,8 @@ class riverApp(ShowBase):
         return task.done
     
     def auto_spawn_log(self, task):
-        self.spawnLog()
+        if self.lenlogPoses < 20*self.waveNr:
+            self.spawnLog()
         return task.again
     
     def create_text_texture(self, text_lines):
@@ -552,7 +618,7 @@ class riverApp(ShowBase):
         #card_np. """
 
         #return card_np
-        return
+        return text_np
         
     
     
