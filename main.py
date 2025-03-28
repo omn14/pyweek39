@@ -14,6 +14,7 @@ from panda3d.bullet import BulletCapsuleShape, BulletRigidBodyNode
 import random
 from panda3d.core import TextNode, PNMImage, Texture, CardMaker
 from panda3d.core import BitMask32
+from panda3d.core import PGFrameStyle
 # Load configuration settings to show buffers
 #loadPrcFileData("", "show-buffers t")
 loadPrcFileData("", "notify-level-info")
@@ -110,7 +111,7 @@ class riverApp(ShowBase):
                              #f"Total Logs lost: {self.LogsLost}",
                              f"Cost of logs lost this wave: {self.costOfLogsLost:.2f}"])
         
-        self.scoreKeep.set_pos(65.0, -38, 0)
+        self.scoreKeep.set_pos(67.0, -38, 0)
 
         
         self.nextWaveTime = 5
@@ -155,6 +156,10 @@ class riverApp(ShowBase):
                 #self.taskMgr.remove("UpdatePhysicsTask")
                 self.taskMgr.remove("AutoSpawnLogTask")
                 self.taskMgr.doMethodLater(1, self.end_game, "restart_game")
+                self.waveKeep.node().set_text("\n".join([f"Wave: {self.waveNr}",
+                              f"Next wave in: {int(minutes)}:{int(seconds):02d}",
+                              f"Next wave Cost: {self.nextWaveCost:.2f}",
+                              f"Money in bank: {self.MoneyInBank:.2f}"]))
                 return task.done
             
         return task.again
@@ -433,10 +438,11 @@ class riverApp(ShowBase):
         terrain_np = self.bulletTerrain()
         #self.goalBox = self.add_collision_box()
         self.goalBox = self.add_collision_box(whatbox='outBox',pos=(76, 39, 1),half_extents=(30.5, 5.5, 10.5),t=["Goal, Sawmill", "Score: 0"])
-        self.goalBox.node().get_child(0).set_text_color(0.5, 1, 0.5, 1)  # Set color to red
-        #self.goalBox.node().get_child(0).set_card_color(1, 0, 0, 0)  # background
-        self.goalBox_neg1 = self.add_collision_box(whatbox='negBox1',pos=(-50, 39, 1),half_extents=(30.5, 5.5, 10.5),t=[f"Lost logs: 0"])
-        self.goalBox_neg2 = self.add_collision_box(whatbox='negBox2',pos=(16, -41, 1),half_extents=(17.5, 5.5, 15.5),t=[f"Lost logs: 0"])
+        self.goalBox.node().get_child(0).set_text_color(0.0, 0.4, 0.0, 1)  
+        #self.goalBox.node().get_child(0).set_card_color(0, 0, 0, 0.7)  # background
+        self.goalBox.node().get_child(0).set_card_color(1, 0, 0, 0)  # background
+        self.goalBox_neg1 = self.add_collision_box(whatbox='negBox1',pos=(-50, 39, 1),half_extents=(90.5, 5.5, 10.5),t=[f"Lost logs: 0"])
+        self.goalBox_neg2 = self.add_collision_box(whatbox='negBox2',pos=(16, -41, -5),half_extents=(14.5, 5.5, 15.5),t=[f"Lost logs: 0"])
         
         #self.goalBox_neg1.get_child(0).setTransparency(True)
         self.goals = []
@@ -466,12 +472,14 @@ class riverApp(ShowBase):
         self.lig['outBox'] = []
         self.lig['negBox1'] = []
         self.lig['negBox2'] = []
-        self.goalBox_neg1.node().get_child(0).set_text_color(1, 0, 0, 1)  # Set color to red
+        self.goalBox_neg1.node().get_child(0).set_text_color(0.7, 0, 0, 1)  # Set color to red
         self.goalBox_neg1.node().get_child(0).set_card_color(1, 0, 0, 0)  # Black background
         self.goalBox_neg1.node().get_child(0).set_text("\n".join([f"Lost logs: {len(self.lig[self.goalBox_neg1.node().getName()])}"]))
-        self.goalBox_neg2.node().get_child(0).set_text_color(1, 0, 0, 1)  # Set color to red
+        self.goalBox_neg2.node().get_child(0).set_text_color(0.7, 0, 0, 1)  # Set color to red
         self.goalBox_neg2.node().get_child(0).set_card_color(1, 0, 0, 0)  # Black background
-        self.goalBox_neg2.node().get_child(0).set_text("\n".join([f"Lost logs: {len(self.lig[self.goalBox_neg2.node().getName()])}"]))
+        """ self.goalBox_neg2.node().get_child(0).set_frame_color(1, 0, 0, 1)  # Red frame
+        self.goalBox_neg2.node().get_child(0).set_frame_line_width(2)  # Frame width
+        self.goalBox_neg2.node().get_child(0).set_frame_as_margin(0.1, 0.1, 0.1, 0.1)  # Frame margins """
         self.taskMgr.add(self.update_physics, "UpdatePhysicsTask")
 
     def update_physics(self, task):
@@ -612,6 +620,18 @@ class riverApp(ShowBase):
     
     def spawnLog(self):
         self.logs.append(self.add_collision_capsule())
+        if random.random() > 0.0125/5 and self.logs[-1].node().get_mass() < 6 and self.logs[-1].node().get_mass() > 3:
+            duck = self.loader.loadModel("assets/blender/duck.egg")
+            duck.reparentTo(self.logs[-1])
+            duck.setH(90)
+            duck.setScale(11.5,11.5,11.5)
+            self.logs[-1].node().set_angular_factor((0, 0, 1))
+            # Keep the z-axis pointing up by restricting rotation 
+            # This constrains rotation to only happen around the y-axis (main axis of log)
+              # Allow rotation only around Y axis (log's main axis)
+
+
+
         #self.textures['A'].write("outfield.png")
         return
     
@@ -706,6 +726,9 @@ class riverApp(ShowBase):
         text_node.set_card_color(0, 0, 0, 1)  # Black background
         text_node.set_card_as_margin(0.2, 0.2, 0.2, 0.2)
         text_node.set_card_decal(True)
+        text_node.set_frame_as_margin(0.1, 0.1, 0.1, 0.1)
+        text_node.set_frame_color(0, 0, 1, 1)
+        text_node.set_frame_line_width(4)
 
         # Create a NodePath for the TextNode
         text_np = self.render.attach_new_node(text_node)
