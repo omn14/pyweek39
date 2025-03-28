@@ -43,7 +43,7 @@ float samplePressure(vec2 pos)
     {
         //fragColor = vec4(0.0, 0.0, 999.0, 0.0);
         //fragColor = vec4(outputVelocity+0.1, 0.0, 0.0);
-        return texture(PressureTexture, pos).x+0.9;
+        return texture(PressureTexture, pos).x+2.5;
     }
 
     for (int i = 0; i < MAX_LOGS; i++) {
