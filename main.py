@@ -95,28 +95,31 @@ class riverApp(ShowBase):
                                   "Get as many logs to the end as possible",
                                   "Longer logs score more points"])
         
-        self.MoneyInBank = 9.0
+        self.MoneyInBank = 100.0
         self.MoneySpent = 0.0
         self.MoneyEarned = 0.0
         self.LogsDelivered = 0
         self.LogsLost = 0
         self.costOfLogsLost = 0.0
-        self.scoreKeep = self.create_text_texture([f"Money in bank: {self.MoneyInBank:.2f}",
-                             f"Money spent: {self.MoneySpent:.2f}",
-                             f"Money earned: {self.MoneyEarned:.2f}",
-                             f"Logs delivered: {self.LogsDelivered}",
-                             f"Total Logs lost: {self.LogsLost}",
-                             f"Cost of logs lost: {self.costOfLogsLost:.2f}"])
+        self.waveNr = 0
+        self.scoreKeep = self.create_text_texture([#f"Money in bank: {self.MoneyInBank:.2f}",
+                             #f"Money spent: {self.MoneySpent:.2f}",
+                             f"Current Wave: {self.waveNr}",
+                             f"Money earned this wave: {self.MoneyEarned:.2f}",
+                             #f"Logs delivered: {self.LogsDelivered}",
+                             #f"Total Logs lost: {self.LogsLost}",
+                             f"Cost of logs lost this wave: {self.costOfLogsLost:.2f}"])
         
         self.scoreKeep.set_pos(65.0, -38, 0)
 
-        self.waveNr = 0
-        self.nextWaveTime = 10
+        
+        self.nextWaveTime = 5
         self.nextWaveCost = 10
         minutes, seconds = divmod(self.nextWaveTime, 60)
         self.waveKeep = self.create_text_texture([f"Wave: {self.waveNr}",
                                                   f"Next wave in: {int(minutes)}:{int(seconds):02d}",
-                                                  f"Next wave Cost: {self.nextWaveCost:.2f}"])
+                                                  f"Next wave Cost: {self.nextWaveCost:.2f}",
+                                                  f"Money in bank: {self.MoneyInBank:.2f}"])
         self.waveKeep.set_pos(65.0, -20, 12)
         self.taskMgr.add(self.waveControler, "WaveControlerTask")
 
@@ -128,14 +131,15 @@ class riverApp(ShowBase):
         minutes, seconds = divmod(self.nextWaveTime, 60)
         self.waveKeep.node().set_text("\n".join([f"Wave: {self.waveNr}",
                               f"Next wave in: {int(minutes)}:{int(seconds):02d}",
-                              f"Next wave Cost: {self.nextWaveCost:.2f}"]))
+                              f"Next wave Cost: {self.nextWaveCost:.2f}",
+                                                  f"Money in bank: {self.MoneyInBank:.2f}"]))
         if self.nextWaveTime <= 0:
             self.waveNr += 1
             self.nextWaveTime = 100
-            self.nextWaveCost = 10
             self.taskMgr.doMethodLater(3, self.auto_spawn_log, "AutoSpawnLogTask")
             self.MoneyInBank = self.MoneyInBank + self.MoneyEarned - self.nextWaveCost - self.costOfLogsLost
             self.MoneyEarned = 0.0
+            self.nextWaveCost += 10
             self.MoneySpent += self.nextWaveCost
             self.costOfLogsLost = 0.0
             self.updateScore()
@@ -193,14 +197,14 @@ class riverApp(ShowBase):
             self.physics_world.remove(log.node())
             log.remove_node()
         # Reset game variables
-        self.MoneyInBank = 9.0
+        self.MoneyInBank = 100.0
         self.MoneySpent = 0.0
         self.MoneyEarned = 0.0
         self.LogsDelivered = 0
         self.LogsLost = 0
         self.costOfLogsLost = 0.0
         self.waveNr = 0
-        self.nextWaveTime = 10
+        self.nextWaveTime = 100
         self.nextWaveCost = 10
         self.logs = []
         self.rockBarriers = []
@@ -212,7 +216,8 @@ class riverApp(ShowBase):
         minutes, seconds = divmod(self.nextWaveTime, 60)
         self.waveKeep.node().set_text("\n".join([f"Wave: {self.waveNr}",
                                                   f"Next wave in: {int(minutes)}:{int(seconds):02d}",
-                                                  f"Next wave Cost: {self.nextWaveCost:.2f}"]))
+                                                  f"Next wave Cost: {self.nextWaveCost:.2f}",
+                                                  f"Money in bank: {self.MoneyInBank:.2f}"]))
         self.goalBox.node().get_child(0).set_text("\n".join(["Goal, Sawmill", "Score: 0"]))
         self.goalBox_neg1.node().get_child(0).set_text("\n".join([f"Lost logs: 0"]))
         self.goalBox_neg2.node().get_child(0).set_text("\n".join([f"Lost logs: 0"]))
@@ -226,12 +231,13 @@ class riverApp(ShowBase):
         return 
 
     def updateScore(self):
-        self.scoreKeep.node().set_text("\n".join([f"Money in bank: {self.MoneyInBank:.2f}",
-                             f"Money spent: {self.MoneySpent:.2f}",
-                             f"Money earned: {self.MoneyEarned:.2f}",
-                             f"Logs delivered: {self.LogsDelivered}",
-                             f"Total Logs lost: {self.LogsLost}",
-                             f"Cost of logs lost: {self.costOfLogsLost:.2f}"]))
+        self.scoreKeep.node().set_text("\n".join([#f"Money in bank: {self.MoneyInBank:.2f}",
+                             #f"Money spent: {self.MoneySpent:.2f}",
+                             f"Current Wave: {self.waveNr}",
+                             f"Money earned this wave: {self.MoneyEarned:.2f}",
+                             #f"Logs delivered: {self.LogsDelivered}",
+                             #f"Total Logs lost: {self.LogsLost}",
+                             f"Cost of logs lost this wave: {self.costOfLogsLost:.2f}"]))
 
     def create_buffer(self, name):
         """ mybuffer = base.win.makeTextureBuffer(name, 512, 512)
