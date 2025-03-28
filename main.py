@@ -79,7 +79,7 @@ class riverApp(ShowBase):
         self.taskMgr.add(self.update_shaders, "UpdateShadersTask")
         self.accept("v", self.bufferViewer.toggleEnable)
         
-
+        self.rockBarriers = []
         self.logs = []    
         self.random_numbers = [random.uniform(0.1, 2) for _ in range(200)]
         self.setup_physics()
@@ -95,28 +95,32 @@ class riverApp(ShowBase):
                                   "Get as many logs to the end as possible",
                                   "Longer logs score more points"])
         
-        self.MoneyInBank = 100.0
+        self.MoneyInBank = 9.0
         self.MoneySpent = 0.0
         self.MoneyEarned = 0.0
         self.LogsDelivered = 0
         self.LogsLost = 0
+        self.costOfLogsLost = 0.0
         self.scoreKeep = self.create_text_texture([f"Money in bank: {self.MoneyInBank:.2f}",
                              f"Money spent: {self.MoneySpent:.2f}",
                              f"Money earned: {self.MoneyEarned:.2f}",
                              f"Logs delivered: {self.LogsDelivered}",
-                             f"Total Logs lost: {self.LogsLost}"])
+                             f"Total Logs lost: {self.LogsLost}",
+                             f"Cost of logs lost: {self.costOfLogsLost:.2f}"])
         
-        self.scoreKeep.set_pos(60.0, -40, 0)
+        self.scoreKeep.set_pos(65.0, -38, 0)
 
         self.waveNr = 0
         self.nextWaveTime = 10
-        self.nextWaveCost = 100
+        self.nextWaveCost = 10
         minutes, seconds = divmod(self.nextWaveTime, 60)
         self.waveKeep = self.create_text_texture([f"Wave: {self.waveNr}",
                                                   f"Next wave in: {int(minutes)}:{int(seconds):02d}",
                                                   f"Next wave Cost: {self.nextWaveCost:.2f}"])
         self.waveKeep.set_pos(65.0, -20, 12)
         self.taskMgr.add(self.waveControler, "WaveControlerTask")
+
+        self.accept("r", self.restart_game)
 
     def waveControler(self,task):
         task.delayTime = 1
@@ -130,19 +134,104 @@ class riverApp(ShowBase):
             self.nextWaveTime = 100
             self.nextWaveCost = 10
             self.taskMgr.doMethodLater(3, self.auto_spawn_log, "AutoSpawnLogTask")
-            self.MoneyInBank = self.MoneyInBank + self.MoneyEarned - self.nextWaveCost
+            self.MoneyInBank = self.MoneyInBank + self.MoneyEarned - self.nextWaveCost - self.costOfLogsLost
             self.MoneyEarned = 0.0
             self.MoneySpent += self.nextWaveCost
+            self.costOfLogsLost = 0.0
             self.updateScore()
+
+            if self.MoneyInBank < 0:
+                self.gameOvertnp = self.create_text_texture(["Game Over"])
+                self.gameOvertnp.set_pos(0, 0, 12)
+                self.gameOvertnp.set_scale(5)
+
+                self.restart_game_tnp = self.create_text_texture(["Press 'r' to restart"])
+                self.restart_game_tnp.set_pos(0, -12, 12)
+                self.restart_game_tnp.set_scale(5)
+                #self.taskMgr.remove("UpdatePhysicsTask")
+                self.taskMgr.remove("AutoSpawnLogTask")
+                self.taskMgr.doMethodLater(1, self.end_game, "restart_game")
+                return task.done
             
         return task.again
+    
+    def end_game(self,task):
+        # Clean up all tasks
+        self.taskMgr.remove("UpdateShadersTask")
+        self.taskMgr.remove("SampleVelFieldTask")
+        self.taskMgr.remove("MousePosTask")
+        self.taskMgr.remove("WaveControlerTask")
+        self.taskMgr.remove("UpdatePhysicsTask")
+        self.taskMgr.remove("AutoSpawnLogTask")
+        self.taskMgr.remove("RockUpdateTask")
+        self.taskMgr.remove("Ru")
+        return task.done
+
+    def restart_game(self):
+        self.gameOvertnp.remove_node()
+        self.restart_game_tnp.remove_node()
+
+        for r in range(len(self.rockBarriers)):
+            self.mouses.pop_back()
+            #self.mouses.set_element(r, (0,0))
+            self.physics_world.remove(self.rockBarriers[0].node())
+            self.rockBarriers[0].remove_node()
+            self.rockBarriers.pop(0)
+            
+        
+        """ for rb in self.rockBarriers:
+            self.physics_world.remove(rb.node())
+            rb.remove_node()
+        self.rockBarriers = []
+        self.mouses = PTALVecBase2f() """
+        self.mouses.push_back((0,0))
+        self.taskMgr.doMethodLater(.1, self.updateRocks, "updaterocksrestart")
+        self.mouses.pop_back()
+        #self.updateRocks
+
+        for log in self.logs:
+            self.physics_world.remove(log.node())
+            log.remove_node()
+        # Reset game variables
+        self.MoneyInBank = 9.0
+        self.MoneySpent = 0.0
+        self.MoneyEarned = 0.0
+        self.LogsDelivered = 0
+        self.LogsLost = 0
+        self.costOfLogsLost = 0.0
+        self.waveNr = 0
+        self.nextWaveTime = 10
+        self.nextWaveCost = 10
+        self.logs = []
+        self.rockBarriers = []
+        self.logsInGoal = []
+        self.lig = {'outBox': [], 'negBox1': [], 'negBox2': []}
+
+        # Update UI elements
+        self.updateScore()
+        minutes, seconds = divmod(self.nextWaveTime, 60)
+        self.waveKeep.node().set_text("\n".join([f"Wave: {self.waveNr}",
+                                                  f"Next wave in: {int(minutes)}:{int(seconds):02d}",
+                                                  f"Next wave Cost: {self.nextWaveCost:.2f}"]))
+        self.goalBox.node().get_child(0).set_text("\n".join(["Goal, Sawmill", "Score: 0"]))
+        self.goalBox_neg1.node().get_child(0).set_text("\n".join([f"Lost logs: 0"]))
+        self.goalBox_neg2.node().get_child(0).set_text("\n".join([f"Lost logs: 0"]))
+
+        # Restart tasks
+        self.taskMgr.add(self.update_shaders, "UpdateShadersTask")
+        self.taskMgr.add(self.sampleVelField, "SampleVelFieldTask")
+        self.taskMgr.add(self.mousePos, "MousePosTask")
+        self.taskMgr.add(self.waveControler, "WaveControlerTask")
+        self.taskMgr.add(self.update_physics, "UpdatePhysicsTask")
+        return 
 
     def updateScore(self):
         self.scoreKeep.node().set_text("\n".join([f"Money in bank: {self.MoneyInBank:.2f}",
                              f"Money spent: {self.MoneySpent:.2f}",
                              f"Money earned: {self.MoneyEarned:.2f}",
                              f"Logs delivered: {self.LogsDelivered}",
-                             f"Total Logs lost: {self.LogsLost}"]))
+                             f"Total Logs lost: {self.LogsLost}",
+                             f"Cost of logs lost: {self.costOfLogsLost:.2f}"]))
 
     def create_buffer(self, name):
         """ mybuffer = base.win.makeTextureBuffer(name, 512, 512)
@@ -337,9 +426,11 @@ class riverApp(ShowBase):
         self.physics_world.attach(ground_node)
         terrain_np = self.bulletTerrain()
         #self.goalBox = self.add_collision_box()
-        self.goalBox = self.add_collision_box(whatbox='outBox',pos=(76, 32, 1),half_extents=(17.5, 5.5, 10.5),t=["Goal, Sawmill", "Score: 0"])
-        self.goalBox_neg1 = self.add_collision_box(whatbox='negBox1',pos=(-50, 32, 1),half_extents=(17.5, 5.5, 10.5),t=[f"Lost logs: 0"])
-        self.goalBox_neg2 = self.add_collision_box(whatbox='negBox2',pos=(10, -40, 1),half_extents=(17.5, 5.5, 10.5),t=[f"Lost logs: 0"])
+        self.goalBox = self.add_collision_box(whatbox='outBox',pos=(76, 39, 1),half_extents=(30.5, 5.5, 10.5),t=["Goal, Sawmill", "Score: 0"])
+        self.goalBox.node().get_child(0).set_text_color(0.5, 1, 0.5, 1)  # Set color to red
+        #self.goalBox.node().get_child(0).set_card_color(1, 0, 0, 0)  # background
+        self.goalBox_neg1 = self.add_collision_box(whatbox='negBox1',pos=(-50, 39, 1),half_extents=(30.5, 5.5, 10.5),t=[f"Lost logs: 0"])
+        self.goalBox_neg2 = self.add_collision_box(whatbox='negBox2',pos=(16, -41, 1),half_extents=(17.5, 5.5, 15.5),t=[f"Lost logs: 0"])
         
         #self.goalBox_neg1.get_child(0).setTransparency(True)
         self.goals = []
@@ -404,6 +495,7 @@ class riverApp(ShowBase):
             contact.getNode0().get_child(0).set_text_color(1, 0, 0, 1)  # Set color to red
             contact.getNode0().get_child(0).set_card_color(1, 0, 0, 0)  # Black background
             self.LogsLost += 1
+            self.costOfLogsLost += contact.getNode1().get_mass()*.5
             
             
         else:
@@ -413,6 +505,7 @@ class riverApp(ShowBase):
 
         
         self.updateScore()
+        self.physics_world.remove(contact.getNode1())
         #contact.getNode1().set_into_collide_mask(BitMask32.all_off())
 
         print(contact.getNode0())
@@ -465,6 +558,11 @@ class riverApp(ShowBase):
 
         # Add the capsule to the physics world
         self.physics_world.attach(capsule_node)
+
+        """ trunk = self.loader.loadModel("assets/blender/log.egg")
+        trunk.reparentTo(capsule_np)
+        trunk.setH(90)
+        trunk.setScale(height+.1,8,8) """
 
         return capsule_np
     
@@ -548,7 +646,16 @@ class riverApp(ShowBase):
                 self.taskMgr.doMethodLater(1, self.rockUpdate, "RockUpdateTask")
             if base.mouseWatcherNode.is_button_down("mouse3"):
                 #self.cards['A'].set_shader_input("iMousePos", (x,y))
-                self.mouses.push_back((x,y))
+                if len(self.mouses) >= 5:
+                    self.mouses.push_back((x,y))
+                    for i in range(5):
+                        self.mouses.set_element(i, self.mouses.get_element(i+1))
+                    self.mouses.pop_back()
+                    self.physics_world.remove(self.rockBarriers[0].node())
+                    self.rockBarriers[0].remove_node()
+                    self.rockBarriers.pop(0)
+                else:
+                    self.mouses.push_back((x,y))
                 self.numMouses = len(self.mouses)
                 #self.cards['A'].set_shader_input("iMaxRocks", int(self.numMouses))
                 #self.cards['A'].set_shader_input("iMousePoses", self.mouses)
@@ -558,6 +665,9 @@ class riverApp(ShowBase):
                 cap.set_pos(result.getHitPos().x, result.getHitPos().y, 0)
                 cap.set_hpr(0,90,0)
                 cap.node().set_mass(0)
+                cap.node().set_kinematic(True)
+                self.rockBarriers.append(cap)
+
             self.rockTimer = 100
         return task.cont
     
