@@ -96,7 +96,7 @@ class riverApp(ShowBase):
                                   "Get as many logs to the end as possible",
                                   "Longer logs score more points"])
         
-        self.MoneyInBank = 9.0
+        self.MoneyInBank = 100.0
         self.MoneySpent = 0.0
         self.MoneyEarned = 0.0
         self.LogsDelivered = 0
@@ -532,9 +532,9 @@ class riverApp(ShowBase):
         
         self.updateScore()
         # Check if the node has children and remove them first
-        """ while contact.getNode1().get_num_children() > 0:
+        while contact.getNode1().get_num_children() > 0:
             child_np = NodePath(contact.getNode1().get_child(0))
-            child_np.remove_node()  # Remove child using NodePath """
+            child_np.remove_node()  # Remove child using NodePath
 
         self.physics_world.remove(contact.getNode1())
         #contact.getNode1().set_into_collide_mask(BitMask32.all_off())
@@ -581,7 +581,8 @@ class riverApp(ShowBase):
 
         # Attach the capsule to the scene
         capsule_np = self.render.attach_new_node(capsule_node)
-        capsule_np.set_pos(-3*64/2, -9, 12)  # Position at the origin
+        #capsule_np.set_pos(-3*64/2, -9, 12)  # very good positions
+        capsule_np.set_pos(-3*64/2+random.random()*5, -9+random.random()*19, 12)  # Position at the origin
         #capsule_np.set_pos(0, 0, 1)  # Position at the origin
         # Set the initial velocity of the capsule
         capsule_node.set_linear_velocity((1, 0, 0))  # Velocity in the x-direction
