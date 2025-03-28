@@ -96,7 +96,7 @@ class riverApp(ShowBase):
                                   "Get as many logs to the end as possible",
                                   "Longer logs score more points"])
         
-        self.MoneyInBank = 100.0
+        self.MoneyInBank = 9.0
         self.MoneySpent = 0.0
         self.MoneyEarned = 0.0
         self.LogsDelivered = 0
@@ -124,7 +124,7 @@ class riverApp(ShowBase):
         self.waveKeep.set_pos(65.0, -20, 12)
         self.taskMgr.add(self.waveControler, "WaveControlerTask")
 
-        self.accept("r", self.restart_game)
+        self.accept("r-up", self.restart_game)
 
     def waveControler(self,task):
         task.delayTime = 1
@@ -177,7 +177,19 @@ class riverApp(ShowBase):
         return task.done
 
     def restart_game(self):
-        self.gameOvertnp.remove_node()
+        # Clean up all tasks
+        self.taskMgr.remove("UpdateShadersTask")
+        self.taskMgr.remove("SampleVelFieldTask")
+        self.taskMgr.remove("MousePosTask")
+        self.taskMgr.remove("WaveControlerTask")
+        self.taskMgr.remove("UpdatePhysicsTask")
+        self.taskMgr.remove("AutoSpawnLogTask")
+        self.taskMgr.remove("RockUpdateTask")
+        self.taskMgr.remove("Ru")
+        try:
+            self.gameOvertnp.remove_node()
+        except:
+            return
         self.restart_game_tnp.remove_node()
 
         for r in range(len(self.rockBarriers)):
@@ -186,7 +198,7 @@ class riverApp(ShowBase):
             self.physics_world.remove(self.rockBarriers[0].node())
             self.rockBarriers[0].remove_node()
             self.rockBarriers.pop(0)
-            
+        
         
         """ for rb in self.rockBarriers:
             self.physics_world.remove(rb.node())
@@ -209,8 +221,8 @@ class riverApp(ShowBase):
         self.LogsLost = 0
         self.costOfLogsLost = 0.0
         self.waveNr = 0
-        self.nextWaveTime = 100
-        self.nextWaveCost = 10
+        self.nextWaveTime = 3
+        self.nextWaveCost = 0
         self.logs = []
         self.rockBarriers = []
         self.logsInGoal = []
@@ -519,6 +531,11 @@ class riverApp(ShowBase):
 
         
         self.updateScore()
+        # Check if the node has children and remove them first
+        """ while contact.getNode1().get_num_children() > 0:
+            child_np = NodePath(contact.getNode1().get_child(0))
+            child_np.remove_node()  # Remove child using NodePath """
+
         self.physics_world.remove(contact.getNode1())
         #contact.getNode1().set_into_collide_mask(BitMask32.all_off())
 
@@ -620,7 +637,7 @@ class riverApp(ShowBase):
     
     def spawnLog(self):
         self.logs.append(self.add_collision_capsule())
-        if random.random() > 0.0125/5 and self.logs[-1].node().get_mass() < 6 and self.logs[-1].node().get_mass() > 3:
+        if random.random() > 0.75 and self.logs[-1].node().get_mass() < 6 and self.logs[-1].node().get_mass() > 3:
             duck = self.loader.loadModel("assets/blender/duck.egg")
             duck.reparentTo(self.logs[-1])
             duck.setH(90)
