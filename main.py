@@ -138,6 +138,7 @@ class riverApp(ShowBase):
         self.gamePaused = False
         self.restarting=False
         self.accept("escape-up", self.escMenu)
+        self.accept("q-up", self.exit_game)
 
     def escMenu(self):
         # Pause the game
@@ -163,6 +164,13 @@ class riverApp(ShowBase):
             remove_node = self.pausenp.remove_node()
             remove_node = self.pausenp2.remove_node()
             remove_node = self.pausenp3.remove_node()
+
+    def exit_game(self):
+        # Clean up resources
+        if hasattr(self, 'background_music') and self.background_music:
+            self.background_music.stop()
+        # Exit the application
+        self.userExit()
         
 
     def waveControler(self,task):
