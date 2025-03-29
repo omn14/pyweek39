@@ -1,15 +1,15 @@
 # Logs Odysseys
-
 ## Overview
-Log Odyssey is a log floating game built using Panda3D, a powerful game engine for 3D rendering and game development. It aims to create semi-realistic fluid flow mechanics where players navigate logs through a a braided river system. It was developed as an entry for pyweek 39, where the theme for the game jam was "Downstream".
+Logs Odysseys is a log floating game built using Panda3D, a powerful game engine for 3D rendering and game development. It aims to create semi-realistic fluid flow mechanics where players navigate logs through a braided river system. It was developed as an entry for PyWeek 39, where the theme for the game jam was "Downstream".
 
 ## Rules
 You just bought a ton of wood upriver. You must float it down to the sawmill to sell at a higher price. Watch out so timber doesn't get stuck or lost off to side rivers. Use left mouse button to push wood with a shock wave. Use right mouse button to place a river barrier. Longer logs have more mass and fetch a higher price at the sawmill, but are more difficult to control. Each batch of wood you buy gets more expensive. Please keep the wood flowing to the mill! If you run out of money in the bank, the game is literally over.
 
 ## Features
-- Realistic water simulation.
-- Dynamic lighting and shadows.
+- Semi-Realistic water simulation based on Navier Stokes equation.
+- Log floation gin braided river
 - Interactive elements for user engagement.
+- Economy system
 
 ## Requirements
 - Python 3.8 or later.
