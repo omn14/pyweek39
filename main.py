@@ -105,7 +105,7 @@ class riverApp(ShowBase):
         """ self.create_text_texture(["How to play:", 
                                   "esc"]) """
         
-        self.MoneyInBank = 0*100.0
+        self.MoneyInBank = 100.0
         self.MoneySpent = 0.0
         self.MoneyEarned = 0.0
         self.LogsDelivered = 0
