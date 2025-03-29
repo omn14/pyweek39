@@ -15,6 +15,7 @@ import random
 from panda3d.core import TextNode, PNMImage, Texture, CardMaker
 from panda3d.core import BitMask32
 from panda3d.core import PGFrameStyle
+from direct.task import Task
 # Load configuration settings to show buffers
 #loadPrcFileData("", "show-buffers t")
 loadPrcFileData("", "notify-level-info")
@@ -31,6 +32,16 @@ class riverApp(ShowBase):
 
         # Disable default camera controls
         self.disableMouse()
+
+        # Setup background music
+        try:
+            self.background_music = self.loader.loadMusic("assets/750289__messysloth__maybe-peaceful-sound.wav")
+            if self.background_music:
+                self.background_music.setLoop(True)
+                self.background_music.setVolume(0.5)
+                self.background_music.play()
+        except Exception as e:
+            print(f"Could not load background music: {e}")
 
         self.cam.set_pos(0, -25*4, 25*4*2)
         self.cam.look_at(0, 0, 0)
@@ -81,6 +92,7 @@ class riverApp(ShowBase):
         self.accept("v", self.bufferViewer.toggleEnable)
         
         self.rockBarriers = []
+        self.rockBarriersTime = []
         self.logs = []    
         self.random_numbers = [random.uniform(0.1, 2) for _ in range(200)]
         self.setup_physics()
@@ -90,13 +102,10 @@ class riverApp(ShowBase):
         self.rockTimer = 0
 
         #self.taskMgr.doMethodLater(3, self.auto_spawn_log, "AutoSpawnLogTask")
-        self.create_text_texture(["How to play:", 
-                                  "Left click for pressure disturbance", 
-                                  "Right click to spawn barrier", 
-                                  "Get as many logs to the end as possible",
-                                  "Longer logs score more points"])
+        """ self.create_text_texture(["How to play:", 
+                                  "esc"]) """
         
-        self.MoneyInBank = 100.0
+        self.MoneyInBank = 0*100.0
         self.MoneySpent = 0.0
         self.MoneyEarned = 0.0
         self.LogsDelivered = 0
@@ -123,8 +132,38 @@ class riverApp(ShowBase):
                                                   f"Money in bank: {self.MoneyInBank:.2f}"])
         self.waveKeep.set_pos(65.0, -20, 12)
         self.taskMgr.add(self.waveControler, "WaveControlerTask")
+        #self.taskMgr.doMethodLater(0.5, self.removeOldRocks, "removeOldRocksTask")
 
         self.accept("r-up", self.restart_game)
+        self.gamePaused = False
+        self.restarting=False
+        self.accept("escape-up", self.escMenu)
+
+    def escMenu(self):
+        # Pause the game
+        self.gamePaused = not self.gamePaused
+        if self.gamePaused:
+            self.pausenp = self.create_text_texture(["Menu"])
+            self.pausenp.set_pos(0, 16, 14)
+            self.pausenp.set_scale(10)
+
+            self.pausenp2 = self.create_text_texture(["Press 'esc' to resume",
+                                                            "Press 'r' to restart",
+                                                            "Press 'q' to quit"])
+            self.pausenp2.set_pos(0, 0, 14)
+            self.pausenp2.set_scale(10)
+
+            self.pausenp3 = self.create_text_texture(["How to play:", 
+                                  "Left click for pressure disturbance", 
+                                  "Right click to spawn barrier", 
+                                  "Get as many logs to the end as possible",
+                                  "Longer logs score more points"])
+            self.pausenp3.set_pos(0, -32, 14)
+        else:
+            remove_node = self.pausenp.remove_node()
+            remove_node = self.pausenp2.remove_node()
+            remove_node = self.pausenp3.remove_node()
+        
 
     def waveControler(self,task):
         task.delayTime = 1
@@ -148,11 +187,11 @@ class riverApp(ShowBase):
             if self.MoneyInBank < 0:
                 self.gameOvertnp = self.create_text_texture(["Game Over"])
                 self.gameOvertnp.set_pos(0, 0, 12)
-                self.gameOvertnp.set_scale(5)
+                self.gameOvertnp.set_scale(10)
 
                 self.restart_game_tnp = self.create_text_texture(["Press 'r' to restart"])
-                self.restart_game_tnp.set_pos(0, -12, 12)
-                self.restart_game_tnp.set_scale(5)
+                self.restart_game_tnp.set_pos(0, -16, 12)
+                self.restart_game_tnp.set_scale(10)
                 #self.taskMgr.remove("UpdatePhysicsTask")
                 self.taskMgr.remove("AutoSpawnLogTask")
                 self.taskMgr.doMethodLater(1, self.end_game, "restart_game")
@@ -174,31 +213,51 @@ class riverApp(ShowBase):
         self.taskMgr.remove("AutoSpawnLogTask")
         self.taskMgr.remove("RockUpdateTask")
         self.taskMgr.remove("Ru")
+        self.taskMgr.remove("removeOldRocksTask")
+        return task.done
+
+    def clearMouses(self,task):
+        self.mouses.clear()
+        self.mouses = PTALVecBase2f()
+        
+        
         return task.done
 
     def restart_game(self):
         # Clean up all tasks
         self.taskMgr.remove("UpdateShadersTask")
         self.taskMgr.remove("SampleVelFieldTask")
-        self.taskMgr.remove("MousePosTask")
+        #self.taskMgr.remove("MousePosTask")
+        self.restarting=True
         self.taskMgr.remove("WaveControlerTask")
         self.taskMgr.remove("UpdatePhysicsTask")
         self.taskMgr.remove("AutoSpawnLogTask")
-        self.taskMgr.remove("RockUpdateTask")
+        #self.taskMgr.remove("RockUpdateTask")
         self.taskMgr.remove("Ru")
+        self.taskMgr.remove("removeOldRocksTask")
         try:
             self.gameOvertnp.remove_node()
+            self.restart_game_tnp.remove_node()
         except:
-            return
-        self.restart_game_tnp.remove_node()
+            print("first restart")
+
+        try:
+            remove_node = self.pausenp.remove_node()
+            remove_node = self.pausenp2.remove_node()
+            remove_node = self.pausenp3.remove_node()
+        except:
+            pass
+        self.gamePaused = False
 
         for r in range(len(self.rockBarriers)):
-            self.mouses.pop_back()
+            #self.mouses.pop_back()
             #self.mouses.set_element(r, (0,0))
             self.physics_world.remove(self.rockBarriers[0].node())
             self.rockBarriers[0].remove_node()
             self.rockBarriers.pop(0)
+            self.rockBarriersTime.pop(0)
         
+        self.mouses.clear()
         
         """ for rb in self.rockBarriers:
             self.physics_world.remove(rb.node())
@@ -206,8 +265,16 @@ class riverApp(ShowBase):
         self.rockBarriers = []
         self.mouses = PTALVecBase2f() """
         self.mouses.push_back((0,0))
+        self.mouses.push_back((0,0))
+        self.mouses.push_back((0,0))
+        self.mouses.push_back((0,0))
+        self.mouses.push_back((0,0))
+        self.mouses.push_back((0,0))
+        self.mouses.push_back((0,0))
+        #self.mouses = PTALVecBase2f()  # Reinitialize the array
         self.taskMgr.doMethodLater(.1, self.updateRocks, "updaterocksrestart")
-        self.mouses.pop_back()
+        #self.mouses.pop_back()
+        self.taskMgr.doMethodLater(0.3, self.clearMouses, "clearMouses")
         #self.updateRocks
 
         for log in self.logs:
@@ -225,6 +292,7 @@ class riverApp(ShowBase):
         self.nextWaveCost = 0
         self.logs = []
         self.rockBarriers = []
+        self.rockBarriersTime = []
         self.logsInGoal = []
         self.lig = {'outBox': [], 'negBox1': [], 'negBox2': []}
 
@@ -240,11 +308,18 @@ class riverApp(ShowBase):
         self.goalBox_neg2.node().get_child(0).set_text("\n".join([f"Lost logs: 0"]))
 
         # Restart tasks
-        self.taskMgr.add(self.update_shaders, "UpdateShadersTask")
+        """ self.taskMgr.add(self.update_shaders, "UpdateShadersTask")
         self.taskMgr.add(self.sampleVelField, "SampleVelFieldTask")
         self.taskMgr.add(self.mousePos, "MousePosTask")
         self.taskMgr.add(self.waveControler, "WaveControlerTask")
-        self.taskMgr.add(self.update_physics, "UpdatePhysicsTask")
+        self.taskMgr.add(self.update_physics, "UpdatePhysicsTask") """
+
+        self.taskMgr.doMethodLater(.5,self.update_shaders, "UpdateShadersTask")
+        self.taskMgr.doMethodLater(.5,self.sampleVelField, "SampleVelFieldTask")
+        self.taskMgr.doMethodLater(.5,self.mousePos, "MousePosTask")
+        self.taskMgr.doMethodLater(.5,self.waveControler, "WaveControlerTask")
+        self.taskMgr.doMethodLater(.5,self.update_physics, "UpdatePhysicsTask")
+        #self.taskMgr.doMethodLater(0.5, self.removeOldRocks, "removeOldRocksTask")
         return 
 
     def updateScore(self):
@@ -494,6 +569,8 @@ class riverApp(ShowBase):
         self.goalBox_neg2.node().get_child(0).set_frame_as_margin(0.1, 0.1, 0.1, 0.1)  # Frame margins """
         self.taskMgr.add(self.update_physics, "UpdatePhysicsTask")
 
+        #self.taskMgr.doMethodLater(1.0, self.removeOldRocks, "removeOldRocksTask")
+
     def update_physics(self, task):
         dt = globalClock.get_dt()
         self.physics_world.do_physics(dt)
@@ -539,7 +616,7 @@ class riverApp(ShowBase):
         self.physics_world.remove(contact.getNode1())
         #contact.getNode1().set_into_collide_mask(BitMask32.all_off())
 
-        print(contact.getNode0())
+        """ print(contact.getNode0())
         print(contact.getNode1())
 
         mpoint = contact.getManifoldPoint()
@@ -548,7 +625,7 @@ class riverApp(ShowBase):
         print(mpoint.getPositionWorldOnA())
         print(mpoint.getPositionWorldOnB())
         print(mpoint.getLocalPointA())
-        print(mpoint.getLocalPointB())
+        print(mpoint.getLocalPointB()) """
     
     def bulletTerrain(self):
         # Create a terrain shape
@@ -676,18 +753,18 @@ class riverApp(ShowBase):
 
             result = self.physics_world.rayTestClosest(pFrom, pTo)
 
-            print(result.hasHit())
+            """ print(result.hasHit())
             print(result.getHitPos())
             print(result.getHitNormal())
             print(result.getHitFraction())
-            print(result.getNode())
+            print(result.getNode()) """
             scaled_x = self.scale(result.getHitPos().x, -3*64/2, 3*64/2, 0, 3*256)
             scaled_y = self.scale(result.getHitPos().y, -64/2, 64/2, 0, 256)
             x = scaled_x/3/256
             y = scaled_y/256
             if base.mouseWatcherNode.is_button_down("mouse1"):
                 self.cards['C'].set_shader_input("iMousePos", (x,y))
-                self.taskMgr.doMethodLater(1, self.rockUpdate, "RockUpdateTask")
+                self.taskMgr.doMethodLater(.1, self.rockUpdate, "RockUpdateTask")
             if base.mouseWatcherNode.is_button_down("mouse3"):
                 #self.cards['A'].set_shader_input("iMousePos", (x,y))
                 if len(self.mouses) >= 5:
@@ -698,22 +775,71 @@ class riverApp(ShowBase):
                     self.physics_world.remove(self.rockBarriers[0].node())
                     self.rockBarriers[0].remove_node()
                     self.rockBarriers.pop(0)
+                    self.rockBarriersTime.pop(0)
                 else:
                     self.mouses.push_back((x,y))
-                self.numMouses = len(self.mouses)
-                #self.cards['A'].set_shader_input("iMaxRocks", int(self.numMouses))
-                #self.cards['A'].set_shader_input("iMousePoses", self.mouses)
+                #self.numMouses = len(self.mouses)
                 self.taskMgr.doMethodLater(0.5, self.updateRocks, "Ru")
-                self.taskMgr.doMethodLater(1, self.rockUpdate, "RockUpdateTask")
+                self.taskMgr.doMethodLater(.5, self.rockUpdate, "RockUpdateTask")
                 cap = self.add_collision_capsule()
                 cap.set_pos(result.getHitPos().x, result.getHitPos().y, 0)
                 cap.set_hpr(0,90,0)
                 cap.node().set_mass(0)
                 cap.node().set_kinematic(True)
                 self.rockBarriers.append(cap)
+                self.rockBarriersTime.append(globalClock.get_frame_time())
 
             self.rockTimer = 100
+        
+        if self.restarting:
+            self.restarting = False
+            return task.done
         return task.cont
+    
+    def removeOldRocks(self,task):
+        
+        if len(self.rockBarriersTime)>0:
+            if globalClock.get_frame_time() - self.rockBarriersTime[0] > 5:
+                #for r in range(len(self.rockBarriers)):
+                #self.mouses.pop_back()
+                #self.mouses.set_element(r, (0,0))
+                """ if len(self.mouses) > 0:
+                    for i in range(len(self.mouses)-1):
+                        self.mouses.set_element(i, self.mouses.get_element(i+1))
+                    self.mouses.pop_back() """
+                #self.physics_world.remove(self.rockBarriers[0].node())
+                #self.rockBarriers[0].remove_node()
+                #self.rockBarriers.pop(0)
+                #self.rockBarriersTime.pop(0)
+                #print(len(self.mouses))
+                """ if len(self.mouses) <= 0:
+                    self.mouses.push_back((0,0))
+                    #self.taskMgr.doMethodLater(.1, self.updateRocks, "updaterocksremove")
+                    self.mouses.pop_back() """
+                
+
+                self.mouses.push_back((0,0))
+                for i in range(len(self.mouses)-2):
+                    self.mouses.set_element(i, self.mouses.get_element(i+1))
+                self.mouses.pop_back()
+
+                # Create a new array with fixed length 5
+                new_mouses = PTALVecBase2f()
+                # Add 5 initial elements (we'll overwrite them)
+                for _ in range(5):
+                    new_mouses.push_back((0,0))
+                    
+                # Shift elements: copy up to 4 elements from the current array
+                for i in range(min(4, len(self.mouses)-1)):
+                    new_mouses.set_element(i, self.mouses.get_element(i+1))
+                    
+                # Replace current array with the new fixed-length array
+                self.mouses = new_mouses
+                self.rockBarriers[0].set_pos(0,0,0)
+
+                self.taskMgr.doMethodLater(.1, self.updateRocks, "updaterocksremove")
+
+        return task.again
     
     def rockUpdate(self,task):
         self.rockTimer = 0
@@ -723,10 +849,12 @@ class riverApp(ShowBase):
     def updateRocks(self,task):
         #self.cards['A'].set_shader_input("iMaxRocks", int(len(self.mouses)))
         #self.cards['A'].set_shader_input("iMousePoses", self.mouses)
+        #self.mouses.push_back((0,0))
         self.cards['A'].set_shader_inputs(
             iMaxRocks = int(len(self.mouses)),
             iMousePoses = self.mouses
         )
+        #self.mouses.pop_back()
         return task.done
     
     def auto_spawn_log(self, task):
