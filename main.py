@@ -488,7 +488,7 @@ class riverApp(ShowBase):
                 #    self.cards['C'].set_shader_input("iLogPos", (scaled_x/3/256, scaled_y/256))
                 self.logPoses.push_back((scaled_x/3/256, scaled_y/256))
                 #log.node().set_linear_velocity((pixel_data[y, x, 2], pixel_data[y, x, 1], 0))
-                scalar = .05  # Define the scalar value
+                scalar = .05 * 30 * globalClock.get_dt()  # Define the scalar value to be frame rate independent
                 velocity = log.node().get_linear_velocity()
                 velocity_limit = 15.0  # Define the velocity limit
                 self.logVelocities.push_back(min(velocity.length(),15)/15)
