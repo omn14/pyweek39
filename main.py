@@ -120,7 +120,7 @@ class riverApp(ShowBase):
                              #f"Total Logs lost: {self.LogsLost}",
                              f"Cost of logs lost this wave: {self.costOfLogsLost:.2f}"])
         
-        self.scoreKeep.set_pos(67.0, -38, 0)
+        self.scoreKeep.set_pos(62.0, -38, 0)
 
         
         self.nextWaveTime = 5
@@ -529,7 +529,7 @@ class riverApp(ShowBase):
         #self.goalBox.node().get_child(0).set_card_color(0, 0, 0, 0.7)  # background
         self.goalBox.node().get_child(0).set_card_color(1, 0, 0, 0)  # background
         self.goalBox_neg1 = self.add_collision_box(whatbox='negBox1',pos=(-50, 39, 1),half_extents=(90.5, 5.5, 10.5),t=[f"Lost logs: 0"])
-        self.goalBox_neg2 = self.add_collision_box(whatbox='negBox2',pos=(16, -41, -5),half_extents=(14.5, 5.5, 15.5),t=[f"Lost logs: 0"])
+        self.goalBox_neg2 = self.add_collision_box(whatbox='negBox2',pos=(14, -41, -5),half_extents=(12.5, 5.5, 15.5),t=[f"Lost logs: 0"])
         
         #self.goalBox_neg1.get_child(0).setTransparency(True)
         self.goals = []
