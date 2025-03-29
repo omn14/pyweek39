@@ -94,7 +94,7 @@ class riverApp(ShowBase):
         self.rockBarriers = []
         self.rockBarriersTime = []
         self.logs = []    
-        self.random_numbers = [random.uniform(0.1, 2) for _ in range(200)]
+        self.random_numbers = [random.uniform(0.1, 2) for _ in range(20000)]
         self.setup_physics()
         self.taskMgr.add(self.sampleVelField, "SampleVelFieldTask")
         self.accept("l", self.spawnLog)
